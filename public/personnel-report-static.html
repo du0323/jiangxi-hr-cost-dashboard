@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>江西战区 · 人员能力分析报告</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#f0f5f4; --card:#fff; --border:#c8d8d6;
+  --primary:#00726D; --primary-light:#e0f2f0; --primary-dark:#002D28;
+  --green:#16a34a; --green-bg:#dcfce7;
+  --red:#dc2626; --red-bg:#fee2e2;
+  --orange:#d97706; --orange-bg:#fef3c7;
+  --gold:#CEA472; --gold-bg:#fdf5eb;
+  --gray:#666; --text:#333; --sub:#666;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.header h1{font-size:17px;font-weight:700}
+.header .sub{font-size:11px;opacity:.8}
+.header-actions{display:flex;gap:8px}
+.header-btn{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;text-decoration:none;transition:all .15s}
+.header-btn:hover{background:rgba(255,255,255,.3)}
+.filter-bar{background:#fff;border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.filter-bar label{font-size:11px;color:var(--gray);font-weight:600;white-space:nowrap}
+.filter-select{padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;background:#f8fafc;color:var(--text);cursor:pointer;min-width:110px}
+.filter-sep{width:1px;height:22px;background:var(--border)}
+.ms-wrap{position:relative}
+.ms-trigger{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;background:#f8fafc;color:var(--text);cursor:pointer;min-width:130px;user-select:none;white-space:nowrap}
+.ms-trigger svg{margin-left:auto;flex-shrink:0;transition:transform .15s}
+.ms-trigger.open svg{transform:rotate(180deg)}
+.ms-panel{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.13);z-index:200;min-width:190px;display:none;flex-direction:column}
+.ms-panel.open{display:flex}
+.ms-search-box{padding:7px 10px;border-bottom:1px solid var(--border)}
+.ms-search-box input{width:100%;border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;outline:none}
+.ms-all-row{padding:6px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+.ms-all-row:hover{background:var(--primary-light)}
+.ms-list{overflow-y:auto;max-height:210px}
+.ms-item{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:12px;cursor:pointer}
+.ms-item:hover{background:var(--primary-light)}
+.ms-item input,.ms-all-row input{accent-color:var(--primary);cursor:pointer}
+.ms-count-badge{background:var(--primary);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px}
+.content{padding:14px 16px 40px;max-width:1200px;margin:0 auto}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.stat-card{background:var(--card);border-radius:8px;padding:10px 12px;border:1px solid var(--border);text-align:center;border-top:3px solid var(--primary)}
+.stat-card.green{border-top-color:var(--green)}.stat-card.orange{border-top-color:var(--orange)}
+.stat-label{font-size:10px;color:var(--gray);margin-bottom:4px}
+.stat-val{font-size:18px;font-weight:700}
+.stat-sub{font-size:10px;color:var(--sub);margin-top:2px}
+.card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:14px;margin-bottom:12px}
+.section-title{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.section-title::before{content:'';width:3px;height:13px;background:var(--primary);border-radius:2px;display:inline-block}
+.chart-box{position:relative}
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.s-card{border-radius:8px;padding:12px 14px}
+.s-card .s-title{font-weight:700;font-size:13px}
+.s-card .s-desc{font-size:11px;color:#555;margin:5px 0 8px;line-height:1.5}
+.s-card .s-badge{border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700;color:#fff;margin-left:auto}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;margin:2px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#f8fafc;color:var(--gray);font-weight:600;padding:8px 9px;text-align:center;border-bottom:2px solid var(--border);white-space:nowrap}
+thead th:first-child{text-align:left}
+tbody tr:hover{background:#f8fafc}
+tbody td{padding:7px 9px;border-bottom:1px solid var(--border);text-align:center}
+tbody td:first-child{text-align:left;font-weight:600}
+.no-data{text-align:center;padding:24px;color:var(--gray);font-size:12px}
+.loading{text-align:center;padding:60px 20px;color:var(--gray)}
+.loading-spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.footer-note{text-align:center;font-size:11px;color:#aaa;padding:20px 0 10px;border-top:1px solid var(--border);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>人员能力分析报告</h1>
+    <div class="sub">江西战区 · 个人成本 vs 定单量四象限分析</div>
+  </div>
+  <div class="header-actions">
+    <button class="header-btn" onclick="location.reload()">⟳ 刷新</button>
+    <button class="header-btn" onclick="window.print()">🖨 打印/导出PDF</button>
+    <a href="/" class="header-btn">← 返回看板</a>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <label>所属部门</label>
+  <select class="filter-select" id="pFilterDept" onchange="onDeptChange()">
+    <option value="">全部</option>
+  </select>
+  <div class="filter-sep"></div>
+  <label>门店</label>
+  <div class="ms-wrap">
+    <div class="ms-trigger" id="pMsTrigger" onclick="toggleMsPanel()">
+      <span id="pMsLabel">全部门店</span>
+      <svg viewBox="0 0 10 6" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+    </div>
+    <div class="ms-panel" id="pMsPanel">
+      <div class="ms-search-box"><input type="text" placeholder="搜索门店…" oninput="filterMs(this.value)"></div>
+      <label class="ms-all-row"><input type="checkbox" id="pMsSelectAll" onchange="toggleAll(this)"> 全选</label>
+      <div class="ms-list" id="pMsList"></div>
+    </div>
+  </div>
+  <button class="filter-select" style="cursor:pointer;background:#fff" onclick="clearFilters()">清除筛选</button>
+  <span style="margin-left:auto;font-size:11px;color:var(--gray)" id="countInfo">加载中…</span>
+</div>
+
+<div class="content" id="app">
+  <div class="loading" id="loadingState">
+    <div class="loading-spinner"></div>
+    <div>加载数据中…</div>
+  </div>
+</div>
+
+<script>
+// ── Multi-select store dropdown ──
+let _allStores = [];
+function getSel() { return [...document.querySelectorAll('#pMsList input:checked')].map(c=>c.value); }
+function syncLabel() {
+  const s=getSel(),l=document.getElementById('pMsLabel');
+  if(!s.length) l.textContent='全部门店';
+  else if(s.length===1) l.textContent=s[0];
+  else l.innerHTML='已选 <span class="ms-count-badge">'+s.length+'</span> 家门店';
+}
+function syncAll() {
+  const a=document.querySelectorAll('#pMsList input'),c=document.querySelectorAll('#pMsList input:checked');
+  const sa=document.getElementById('pMsSelectAll');
+  sa.indeterminate=c.length>0&&c.length<a.length;
+  sa.checked=a.length>0&&c.length===a.length;
+}
+function toggleMsPanel() {
+  const p=document.getElementById('pMsPanel'),t=document.getElementById('pMsTrigger'),o=p.classList.toggle('open');
+  t.classList.toggle('open',o);
+  if(o){document.getElementById('pMsSearch').value='';filterMs('');setTimeout(()=>document.getElementById('pMsSearch')?.focus(),50)}
+}
+function filterMs(q) {
+  q=q.toLowerCase();
+  document.querySelectorAll('#pMsList .ms-item').forEach(i=>{i.style.display=!q||i.dataset.name.toLowerCase().includes(q)?'':'none'});
+}
+function toggleAll(cb) {
+  document.querySelectorAll('#pMsList input').forEach(c=>c.checked=cb.checked);
+  syncLabel();syncAll();filterAndRender();
+}
+document.addEventListener('click',e=>{const w=document.getElementById('pMsPanel')?.parentElement;if(w&&!w.contains(e.target)){document.getElementById('pMsPanel').classList.remove('open');document.getElementById('pMsTrigger').classList.remove('open')}});
+
+function popMsDropdown() {
+  const dept=document.getElementById('pFilterDept').value;
+  _allStores=[...new Set(ALL_EMPLOYEES.filter(e=>{if(!e.name||e.isIntern)return false;if(dept&&e.dept!==dept)return false;return true}).map(e=>e.store).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh'));
+  const prev=getSel().filter(n=>_allStores.includes(n));
+  document.getElementById('pMsList').innerHTML=_allStores.map(n=>'<label class="ms-item" data-name="'+n+'"><input type="checkbox" value="'+n+'" onchange="syncLabel();syncAll();filterAndRender()"'+(prev.includes(n)?' checked':'')+'> '+n+'</label>').join('');
+  syncLabel();syncAll();
+}
+function onDeptChange() { popMsDropdown(); filterAndRender(); }
+function clearFilters() {
+  document.getElementById('pFilterDept').value='';
+  document.getElementById('pMsList').innerHTML='';
+  document.querySelectorAll('#pMsList input').forEach(c=>c.checked=false);
+  syncLabel();syncAll();popMsDropdown();filterAndRender();
+}
+
+function median(arr){if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2}
+const fmt=n=>(n||0).toLocaleString('zh-CN');
+const ALLOWED_TITLES = ['产品专家','产品专员','储备管理','高级产品专家','资深产品专家','零售主管'];
+
+// ── Embedded static data ──
+const ALL_EMPLOYEES = [{"id":"003576","name":"孙萍","title":"产品专家","store":"江西熊猫广场零售中心","dept":"江西二部","cat":"零售","labor":38151.38,"isIntern":false,"orders":7},{"id":"006763","name":"王建安","title":"产品专家","store":"江西凯德虹口零售中心","dept":"江西一部","cat":"零售","labor":22791.38,"isIntern":false,"orders":0},{"id":"007744","name":"周俊诚","title":"产品专家","store":"江西南翔印象城零售中心","dept":"江西一部","cat":"零售","labor":26655.98,"isIntern":false,"orders":8},{"id":"008314","name":"汤妮","title":"产品专家","store":"江西南丰城零售中心","dept":"江西二部","cat":"零售","labor":28715.5,"isIntern":false,"orders":6},{"id":"009914","name":"李星达","title":"产品专家","store":"江西长泰零售中心","dept":"江西一部","cat":"零售","labor":29561.38,"isIntern":false,"orders":6},{"id":"010652","name":"辛宇","title":"产品专家","store":"江西长泰零售中心","dept":"江西一部","cat":"零售","labor":32326.37,"isIntern":false,"orders":9},{"id":"011123","name":"仝德宝","title":"产品专家","store":"江西蟠龙天地零售中心","dept":"江西二部","cat":"零售","labor":23376.51,"isIntern":false,"orders":1},{"id":"012575","name":"李泽涛","title":"零售主管","store":"江西熊猫广场零售中心","dept":"江西二部","cat":"零售","labor":34807.98,"isIntern":false,"orders":null},{"id":"014481","name":"曾奥","title":"高级产品专家","store":"江西中信泰富万达零售中心","dept":"江西一部","cat":"零售","labor":30033.38,"isIntern":false,"orders":6},{"id":"015223","name":"陶瑾忻","title":"产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":23172.96,"isIntern":false,"orders":2},{"id":"016287","name":"杨春凯","title":"零售主管","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":30010.15,"isIntern":false,"orders":null},{"id":"017304","name":"靳忠澄","title":"产品专家","store":"江西南翔印象城零售中心","dept":"江西一部","cat":"零售","labor":35894.37,"isIntern":false,"orders":9},{"id":"018494","name":"吴亚南","title":"高级产品专家","store":"江西静安大融城零售中心","dept":"江西一部","cat":"零售","labor":34511.38,"isIntern":false,"orders":3},{"id":"018770","name":"丁力","title":"零售主管","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":36189.38,"isIntern":false,"orders":null},{"id":"020334","name":"许皆欢","title":"产品专家","store":"江西中海环宇城Max零售中心","dept":"江西一部","cat":"零售","labor":35441.38,"isIntern":false,"orders":7},{"id":"027893","name":"张启明","title":"产品专家","store":"江西世纪汇零售中心","dept":"江西一部","cat":"零售","labor":19383.47,"isIntern":false,"orders":0},{"id":"028025","name":"高亚辉","title":"产品专家","store":"江西静安大融城零售中心","dept":"江西一部","cat":"零售","labor":28779.86,"isIntern":false,"orders":5},{"id":"033035","name":"刘名扬","title":"高级产品专家","store":"江西熊猫广场零售中心","dept":"江西二部","cat":"零售","labor":40473.38,"isIntern":false,"orders":8},{"id":"033594","name":"王兆康","title":"产品专家","store":"江西张杨路零售中心","dept":"江西一部","cat":"零售","labor":33901.38,"isIntern":false,"orders":4},{"id":"033929","name":"范东剑","title":"零售主管","store":"江西长泰零售中心","dept":"江西一部","cat":"零售","labor":35851.38,"isIntern":false,"orders":null},{"id":"034073","name":"王佳琪","title":"零售主管","store":"江西五角场合生汇零售中心","dept":"江西一部","cat":"零售","labor":42475.38,"isIntern":false,"orders":null},{"id":"035051","name":"徐跃","title":"产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":23436.47,"isIntern":false,"orders":3},{"id":"035056","name":"秦一凡","title":"零售主管","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":32187.38,"isIntern":false,"orders":null},{"id":"039674","name":"翁洁","title":"高级产品专家","store":"江西虹桥天地零售中心","dept":"江西二部","cat":"零售","labor":46691.38,"isIntern":false,"orders":14},{"id":"040572","name":"岳文文","title":"产品专家","store":"江西蟠龙天地零售中心","dept":"江西二部","cat":"零售","labor":32627.55,"isIntern":false,"orders":11},{"id":"042066","name":"赵汝钏","title":"产品专家","store":"江西长宁来福士零售中心","dept":"江西二部","cat":"零售","labor":25751.38,"isIntern":false,"orders":2},{"id":"042650","name":"徐宁","title":"零售主管","store":"江西长宁来福士零售中心","dept":"江西二部","cat":"零售","labor":36831.38,"isIntern":false,"orders":null},{"id":"042788","name":"盛昊","title":"产品专家","store":"江西张杨路零售中心","dept":"江西一部","cat":"零售","labor":13241.73,"isIntern":false,"orders":3},{"id":"042923","name":"潘鑫","title":"产品专家","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":22982.46,"isIntern":false,"orders":6},{"id":"043029","name":"孔泽","title":"零售主管","store":"江西中海环宇城Max零售中心","dept":"江西一部","cat":"零售","labor":39071.38,"isIntern":false,"orders":null},{"id":"044981","name":"徐辉","title":"产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":20474.6,"isIntern":false,"orders":8},{"id":"046496","name":"杨健","title":"高级产品专家","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":30304.25,"isIntern":false,"orders":6},{"id":"048059","name":"王猛","title":"产品专家","store":"江西长宁来福士零售中心","dept":"江西二部","cat":"零售","labor":36984.8,"isIntern":false,"orders":6},{"id":"048395","name":"左政","title":"零售主管","store":"江西世纪汇零售中心","dept":"江西一部","cat":"零售","labor":35971.05,"isIntern":false,"orders":null},{"id":"051506","name":"邵修东","title":"产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":18794.56,"isIntern":false,"orders":1},{"id":"051954","name":"李阳","title":"产品专家","store":"江西五角场合生汇零售中心","dept":"江西一部","cat":"零售","labor":30454.14,"isIntern":false,"orders":5},{"id":"052105","name":"徐丽华","title":"产品专家","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":44844.39,"isIntern":false,"orders":15},{"id":"052524","name":"周慧慧","title":"产品专家","store":"江西静安大融城零售中心","dept":"江西一部","cat":"零售","labor":18829.09,"isIntern":false,"orders":5},{"id":"054110","name":"李景丽","title":"高级产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":22840.6,"isIntern":false,"orders":6},{"id":"054134","name":"冯磊","title":"高级产品专家","store":"江西长泰零售中心","dept":"江西一部","cat":"零售","labor":36789.38,"isIntern":false,"orders":6},{"id":"054484","name":"韦朝林","title":"产品专家","store":"江西张杨路零售中心","dept":"江西一部","cat":"零售","labor":26945.38,"isIntern":false,"orders":4},{"id":"054514","name":"徐长寿","title":"产品专家","store":"江西熊猫广场零售中心","dept":"江西二部","cat":"零售","labor":32281.38,"isIntern":false,"orders":10},{"id":"054701","name":"王星","title":"零售主管","store":"江西红柳路汽车城零售中心","dept":"江西一部","cat":"零售","labor":34022.38,"isIntern":false,"orders":null},{"id":"054703","name":"田薇","title":"产品专家","store":"江西五角场合生汇零售中心","dept":"江西一部","cat":"零售","labor":21552,"isIntern":false,"orders":0},{"id":"054877","name":"张星","title":"产品专家","store":"江西长泰零售中心","dept":"江西一部","cat":"零售","labor":44538.11,"isIntern":false,"orders":9},{"id":"055161","name":"曹豫","title":"产品专家","store":"江西虹桥天地零售中心","dept":"江西二部","cat":"零售","labor":24497.1,"isIntern":false,"orders":6},{"id":"055235","name":"汤宁馨","title":"产品专家","store":"江西静安大融城零售中心","dept":"江西一部","cat":"零售","labor":32445.38,"isIntern":false,"orders":6},{"id":"055338","name":"陈李友","title":"产品专家","store":"江西南翔印象城零售中心","dept":"江西一部","cat":"零售","labor":23089.48,"isIntern":false,"orders":4},{"id":"055514","name":"袁雪辉","title":"产品专家","store":"江西蟠龙天地零售中心","dept":"江西二部","cat":"零售","labor":16930.11,"isIntern":false,"orders":1},{"id":"056281","name":"张林亮","title":"产品专家","store":"江西五角场合生汇零售中心","dept":"江西一部","cat":"零售","labor":26557.24,"isIntern":false,"orders":9},{"id":"057824","name":"李莉","title":"产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":28605.44,"isIntern":false,"orders":5},{"id":"057834","name":"刘凯旋","title":"高级产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":37572.17,"isIntern":false,"orders":13},{"id":"057913","name":"樊楚琦","title":"高级产品专家","store":"江西世纪汇零售中心","dept":"江西一部","cat":"零售","labor":26040.57,"isIntern":false,"orders":3},{"id":"058102","name":"张飞","title":"产品专家","store":"江西长泰零售中心","dept":"江西一部","cat":"零售","labor":30579.82,"isIntern":false,"orders":4},{"id":"058366","name":"洪建军","title":"产品专家","store":"江西凯德虹口零售中心","dept":"江西一部","cat":"零售","labor":32825.2,"isIntern":false,"orders":7},{"id":"058392","name":"张泽旸","title":"产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":22523.38,"isIntern":false,"orders":6},{"id":"058651","name":"王晓寒","title":"高级产品专家","store":"江西红柳路汽车城零售中心","dept":"江西一部","cat":"零售","labor":34971.64,"isIntern":false,"orders":7},{"id":"059536","name":"洪炎","title":"产品专家","store":"江西五角场合生汇零售中心","dept":"江西一部","cat":"零售","labor":21362.99,"isIntern":false,"orders":0},{"id":"060555","name":"郝宇","title":"产品专家","store":"江西虹桥天地零售中心","dept":"江西二部","cat":"零售","labor":27868.25,"isIntern":false,"orders":5},{"id":"061018","name":"张臻彦","title":"产品专家","store":"江西蟠龙天地零售中心","dept":"江西二部","cat":"零售","labor":15254.87,"isIntern":false,"orders":1},{"id":"061144","name":"潘峥","title":"高级产品专家","store":"江西长宁来福士零售中心","dept":"江西二部","cat":"零售","labor":36763.3,"isIntern":false,"orders":8},{"id":"062415","name":"李洁桢","title":"高级产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":42115.62,"isIntern":false,"orders":9},{"id":"062762","name":"赵一帆","title":"零售主管","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":39196.19,"isIntern":false,"orders":null},{"id":"063087","name":"覃文","title":"产品专家","store":"江西宝山龙湖天街零售展厅","dept":"江西一部","cat":"零售","labor":24480.06,"isIntern":false,"orders":5},{"id":"063253","name":"段竣豪","title":"产品专家","store":"江西奉贤天街零售中心","dept":"江西二部","cat":"零售","labor":21261.97,"isIntern":false,"orders":5},{"id":"063800","name":"包嘉伟","title":"产品专家","store":"江西奉贤天街零售中心","dept":"江西二部","cat":"零售","labor":21137.5,"isIntern":false,"orders":6},{"id":"063935","name":"刘萌萌","title":"产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":24134.12,"isIntern":false,"orders":4},{"id":"065740","name":"张艳丽","title":"产品专家","store":"江西中海环宇城Max零售中心","dept":"江西一部","cat":"零售","labor":26166.33,"isIntern":false,"orders":4},{"id":"066343","name":"胡英铭","title":"产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":32027.94,"isIntern":false,"orders":7},{"id":"067783","name":"马小婷","title":"零售主管","store":"江西南翔印象城零售中心","dept":"江西一部","cat":"零售","labor":30793.38,"isIntern":false,"orders":null},{"id":"069149","name":"裴晋达","title":"产品专家","store":"江西凯德虹口零售中心","dept":"江西一部","cat":"零售","labor":25180.69,"isIntern":false,"orders":3},{"id":"069206","name":"张德昌","title":"产品专家","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":22067.88,"isIntern":false,"orders":2},{"id":"069264","name":"薛峰","title":"产品专家","store":"江西长宁来福士零售中心","dept":"江西二部","cat":"零售","labor":20465.64,"isIntern":false,"orders":1},{"id":"069296","name":"张倪峰","title":"产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":20646.64,"isIntern":false,"orders":4},{"id":"069756","name":"董廷超","title":"产品专家","store":"江西嘉亭荟零售中心","dept":"江西一部","cat":"零售","labor":31691.22,"isIntern":false,"orders":9},{"id":"070147","name":"张垚","title":"产品专家","store":"江西蟠龙天地零售中心","dept":"江西二部","cat":"零售","labor":25763.98,"isIntern":false,"orders":6},{"id":"070160","name":"张辉","title":"产品专员","store":"江西世纪汇零售中心","dept":"江西一部","cat":"零售","labor":30184.37,"isIntern":false,"orders":8},{"id":"070266","name":"靳超群","title":"产品专家","store":"江西静安大融城零售中心","dept":"江西一部","cat":"零售","labor":18358.4,"isIntern":false,"orders":3},{"id":"070606","name":"吴灿","title":"产品专家","store":"江西五角场合生汇零售中心","dept":"江西一部","cat":"零售","labor":32473.34,"isIntern":false,"orders":9},{"id":"071711","name":"赵豪","title":"产品专家","store":"江西南翔印象城零售中心","dept":"江西一部","cat":"零售","labor":22718.8,"isIntern":false,"orders":4},{"id":"073032","name":"赵静","title":"高级产品专家","store":"江西奉贤天街零售中心","dept":"江西二部","cat":"零售","labor":38937.81,"isIntern":false,"orders":10},{"id":"073200","name":"郝斐","title":"产品专家","store":"江西虹桥天地零售中心","dept":"江西二部","cat":"零售","labor":32035.78,"isIntern":false,"orders":7},{"id":"073240","name":"谢红","title":"产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":26302.93,"isIntern":false,"orders":5},{"id":"073245","name":"高骥明","title":"产品专员","store":"江西南丰城零售中心","dept":"江西二部","cat":"零售","labor":24034.58,"isIntern":false,"orders":6},{"id":"073390","name":"罗启航","title":"产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":17579.41,"isIntern":false,"orders":0},{"id":"073705","name":"周建强","title":"产品专家","store":"江西凯德虹口零售中心","dept":"江西一部","cat":"零售","labor":25461.38,"isIntern":false,"orders":6},{"id":"073777","name":"杨诗瑜","title":"产品专家","store":"江西中信泰富万达零售中心","dept":"江西一部","cat":"零售","labor":24640.16,"isIntern":false,"orders":5},{"id":"073841","name":"沈烨旻","title":"产品专员","store":"江西红柳路汽车城零售中心","dept":"江西一部","cat":"零售","labor":16719.44,"isIntern":false,"orders":3},{"id":"073913","name":"蒋微","title":"产品专家","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":26851.38,"isIntern":false,"orders":1},{"id":"074305","name":"王耀民","title":"产品专家","store":"江西张杨路零售中心","dept":"江西一部","cat":"零售","labor":30246.1,"isIntern":false,"orders":8},{"id":"074375","name":"刘文君","title":"产品专家","store":"江西熊猫广场零售中心","dept":"江西二部","cat":"零售","labor":29811.02,"isIntern":false,"orders":11},{"id":"074716","name":"张秀","title":"产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":24565.74,"isIntern":false,"orders":8},{"id":"074803","name":"张玉慧","title":"产品专家","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":23646.79,"isIntern":false,"orders":10},{"id":"074902","name":"肖嵘","title":"产品专家","store":"江西南丰城零售中心","dept":"江西二部","cat":"零售","labor":29962.23,"isIntern":false,"orders":6},{"id":"075014","name":"蒋敏","title":"产品专家","store":"江西熊猫广场零售中心","dept":"江西二部","cat":"零售","labor":17066.6,"isIntern":false,"orders":3},{"id":"075801","name":"张书玉","title":"产品专家","store":"江西世纪汇零售中心","dept":"江西一部","cat":"零售","labor":19284.6,"isIntern":false,"orders":6},{"id":"075802","name":"李明浩","title":"产品专员","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":13884.17,"isIntern":false,"orders":4},{"id":"076064","name":"池振星","title":"产品专家","store":"江西宝山龙湖天街零售展厅","dept":"江西一部","cat":"零售","labor":27589.6,"isIntern":false,"orders":10},{"id":"076070","name":"汤琦","title":"产品专家","store":"江西长宁来福士零售中心","dept":"江西二部","cat":"零售","labor":23032.88,"isIntern":false,"orders":7},{"id":"076460","name":"刘帅","title":"产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":15970.6,"isIntern":false,"orders":4},{"id":"076546","name":"段玉新","title":"高级产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":21681,"isIntern":false,"orders":2},{"id":"076722","name":"王炳皓","title":"产品专家","store":"江西嘉亭荟零售中心","dept":"江西一部","cat":"零售","labor":16528.6,"isIntern":false,"orders":3},{"id":"076778","name":"李永兵","title":"产品专家","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":31984.6,"isIntern":false,"orders":14},{"id":"077174","name":"卢旺","title":"产品专家","store":"江西五角场合生汇零售中心","dept":"江西一部","cat":"零售","labor":24244.6,"isIntern":false,"orders":10},{"id":"077189","name":"王星宇","title":"产品专家","store":"江西世纪汇零售中心","dept":"江西一部","cat":"零售","labor":28022.6,"isIntern":false,"orders":9},{"id":"077961","name":"田雅思","title":"储备管理","store":"江西长泰零售中心","dept":"江西一部","cat":"零售","labor":23080.2,"isIntern":false,"orders":7},{"id":"078028","name":"柴澳豪","title":"储备管理","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":23040.2,"isIntern":false,"orders":7},{"id":"078281","name":"裴菁","title":"产品专家","store":"江西中海环宇城Max零售中心","dept":"江西一部","cat":"零售","labor":22564.6,"isIntern":false,"orders":6},{"id":"078303","name":"王沪","title":"产品专家","store":"江西张杨路零售中心","dept":"江西一部","cat":"零售","labor":14386.6,"isIntern":false,"orders":3},{"id":"078330","name":"李俊道","title":"产品专家","store":"江西红柳路汽车城零售中心","dept":"江西一部","cat":"零售","labor":24800.6,"isIntern":false,"orders":9},{"id":"078381","name":"王保","title":"产品专家","store":"江西中信泰富万达零售中心","dept":"江西一部","cat":"零售","labor":10684.6,"isIntern":false,"orders":0},{"id":"078967","name":"汪驿博","title":"产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":19844.6,"isIntern":false,"orders":5},{"id":"079094","name":"杜朝洲","title":"产品专家","store":"江西世纪汇零售中心","dept":"江西一部","cat":"零售","labor":24662.69,"isIntern":false,"orders":10},{"id":"079099","name":"韩彪","title":"产品专家","store":"江西嘉亭荟零售中心","dept":"江西一部","cat":"零售","labor":21386.6,"isIntern":false,"orders":5},{"id":"079106","name":"朱展怀","title":"产品专家","store":"江西南丰城零售中心","dept":"江西二部","cat":"零售","labor":17981.15,"isIntern":false,"orders":3},{"id":"079298","name":"吴家辉","title":"产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":30344.6,"isIntern":false,"orders":10},{"id":"079505","name":"林晓峰","title":"产品专家","store":"江西长宁来福士零售中心","dept":"江西二部","cat":"零售","labor":17837.47,"isIntern":false,"orders":4},{"id":"080264","name":"薛宇","title":"产品专家","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":34800.69,"isIntern":false,"orders":13},{"id":"080284","name":"张义","title":"产品专家","store":"江西静安大融城零售中心","dept":"江西一部","cat":"零售","labor":22584.6,"isIntern":false,"orders":5},{"id":"080666","name":"桂超","title":"产品专家","store":"江西静安大融城零售中心","dept":"江西一部","cat":"零售","labor":16434.6,"isIntern":false,"orders":2},{"id":"080974","name":"柏凌杰","title":"产品专家","store":"江西张杨路零售中心","dept":"江西一部","cat":"零售","labor":16534.6,"isIntern":false,"orders":2},{"id":"081067","name":"汤家俊","title":"产品专家","store":"江西长泰零售中心","dept":"江西一部","cat":"零售","labor":21272.6,"isIntern":false,"orders":6},{"id":"081097","name":"遆政政","title":"产品专家","store":"江西五角场合生汇零售中心","dept":"江西一部","cat":"零售","labor":30754.6,"isIntern":false,"orders":11},{"id":"081748","name":"俞浩","title":"产品专家","store":"江西复地活力城零售中心","dept":"江西二部","cat":"零售","labor":24934.6,"isIntern":false,"orders":8},{"id":"082686","name":"潘镜宇","title":"产品专员","store":"江西前滩LPLAZA零售中心","dept":"江西二部","cat":"零售","labor":11779.17,"isIntern":false,"orders":1},{"id":"083386","name":"黄平","title":"产品专家","store":"江西中信泰富万达零售中心","dept":"江西一部","cat":"零售","labor":21186.6,"isIntern":false,"orders":5},{"id":"083462","name":"孙逢源","title":"产品专员","store":"江西红柳路汽车城零售中心","dept":"江西一部","cat":"零售","labor":16020.17,"isIntern":false,"orders":4},{"id":"083632","name":"陈凤娟","title":"产品专家","store":"江西红柳路汽车城零售中心","dept":"江西一部","cat":"零售","labor":18160.6,"isIntern":false,"orders":6},{"id":"083680","name":"邱亚博","title":"产品专家","store":"江西虹桥天地零售中心","dept":"江西二部","cat":"零售","labor":19884.6,"isIntern":false,"orders":1},{"id":"083697","name":"张凯琪","title":"产品专家","store":"江西嘉亭荟零售中心","dept":"江西一部","cat":"零售","labor":18574.6,"isIntern":false,"orders":7},{"id":"083718","name":"张伟","title":"产品专家","store":"江西张杨路零售中心","dept":"江西一部","cat":"零售","labor":17624.6,"isIntern":false,"orders":4},{"id":"084043","name":"秦浩然","title":"储备管理","store":"江西张杨路零售中心","dept":"江西一部","cat":"零售","labor":23301.2,"isIntern":false,"orders":3},{"id":"084209","name":"王梓灿","title":"产品专家","store":"江西虹桥天地零售中心","dept":"江西二部","cat":"零售","labor":17634.6,"isIntern":false,"orders":6},{"id":"084210","name":"唐炜","title":"产品专家","store":"江西蟠龙天地零售中心","dept":"江西二部","cat":"零售","labor":17580.6,"isIntern":false,"orders":3},{"id":"084453","name":"王昊","title":"产品专家","store":"江西南丰城零售中心","dept":"江西二部","cat":"零售","labor":38594.6,"isIntern":false,"orders":9},{"id":"084653","name":"肖建军","title":"产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":12762.88,"isIntern":false,"orders":0},{"id":"084680","name":"肖亮","title":"产品专家","store":"江西中海环宇城Max零售中心","dept":"江西一部","cat":"零售","labor":30534.6,"isIntern":false,"orders":9},{"id":"085448","name":"徐敏玉","title":"储备管理","store":"江西中海环宇城Max零售中心","dept":"江西一部","cat":"零售","labor":23205.2,"isIntern":false,"orders":2},{"id":"085754","name":"戴陈霖","title":"产品专家","store":"江西凯德虹口零售中心","dept":"江西一部","cat":"零售","labor":22984.6,"isIntern":false,"orders":5},{"id":"085907","name":"徐成龙","title":"产品专家","store":"江西松江手拉手汽车港零售中心","dept":"江西二部","cat":"零售","labor":17938.6,"isIntern":false,"orders":5},{"id":"086014","name":"高晓菲","title":"产品专家","store":"江西长泰零售中心","dept":"江西一部","cat":"零售","labor":29326.6,"isIntern":false,"orders":12},{"id":"086126","name":"吴毅","title":"产品专家","store":"江西虹桥天地零售中心","dept":"江西二部","cat":"零售","labor":17454.6,"isIntern":false,"orders":8},{"id":"086190","name":"杨东坡","title":"产品专家","store":"江西世纪汇零售中心","dept":"江西一部","cat":"零售","labor":18324.6,"isIntern":false,"orders":4},{"id":"086227","name":"俞亮","title":"产品专家","store":"江西凯德虹口零售中心","dept":"江西一部","cat":"零售","labor":23006.6,"isIntern":false,"orders":9},{"id":"086353","name":"殷孜贤","title":"产品专家","store":"江西世纪汇零售中心","dept":"江西一部","cat":"零售","labor":16404.6,"isIntern":false,"orders":2},{"id":"086359","name":"于振宇","title":"产品专员","store":"江西宝山龙湖天街零售展厅","dept":"江西一部","cat":"零售","labor":14138.17,"isIntern":false,"orders":3},{"id":"086793","name":"张春悦","title":"产品专员","store":"江西张杨路零售中心","dept":"江西一部","cat":"零售","labor":18725.17,"isIntern":false,"orders":5},{"id":"086795","name":"张猛","title":"产品专家","store":"江西南翔印象城零售中心","dept":"江西一部","cat":"零售","labor":16834.6,"isIntern":false,"orders":8},{"id":"086810","name":"曹小宝","title":"产品专家","store":"江西宝山龙湖天街零售展厅","dept":"江西一部","cat":"零售","labor":12749.6,"isIntern":false,"orders":2},{"id":"086904","name":"邵戌荣","title":"产品专家","store":"江西长宁来福士零售中心","dept":"江西二部","cat":"零售","labor":18034.6,"isIntern":false,"orders":7},{"id":"086910","name":"王陈龙","title":"产品专家","store":"江西静安大融城零售中心","dept":"江西一部","cat":"零售","labor":15164.6,"isIntern":false,"orders":3},{"id":"086923","name":"张星怡","title":"产品专家","store":"江西奉贤天街零售中心","dept":"江西二部","cat":"零售","labor":14674.6,"isIntern":false,"orders":6}];
+let _chart = null;
+const app = document.getElementById('app');
+const ALLOWED_TITLES = ['产品专家','产品专员','储备管理','高级产品专家','资深产品专家','零售主管'];
+
+function init() {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('countInfo').textContent = '共 ' + ALL_EMPLOYEES.length + ' 人';
+  const depts = [...new Set(ALL_EMPLOYEES.filter(e=>e.dept).map(e=>e.dept))].sort((a,b)=>a.localeCompare(b,'zh'));
+  const df = document.getElementById('pFilterDept');
+  df.innerHTML = '<option value="">全部</option>' + depts.map(d=>'<option value="'+d+'">'+d+'</option>').join('');
+  popMsDropdown();
+  filterAndRender();
+}
+init();
+</script>
+</body>
+</html>

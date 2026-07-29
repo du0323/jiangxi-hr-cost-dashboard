@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>江西战区 · 人员能力分析报告</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#f0f5f4; --card:#fff; --border:#c8d8d6;
+  --primary:#00726D; --primary-light:#e0f2f0; --primary-dark:#002D28;
+  --green:#16a34a; --green-bg:#dcfce7;
+  --red:#dc2626; --red-bg:#fee2e2;
+  --orange:#d97706; --orange-bg:#fef3c7;
+  --gold:#CEA472; --gold-bg:#fdf5eb;
+  --gray:#666; --text:#333; --sub:#666;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.header h1{font-size:17px;font-weight:700}
+.header .sub{font-size:11px;opacity:.8}
+.header-actions{display:flex;gap:8px}
+.header-btn{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;text-decoration:none;transition:all .15s}
+.header-btn:hover{background:rgba(255,255,255,.3)}
+.filter-bar{background:#fff;border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.filter-bar label{font-size:11px;color:var(--gray);font-weight:600;white-space:nowrap}
+.filter-select{padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;background:#f8fafc;color:var(--text);cursor:pointer;min-width:110px}
+.filter-sep{width:1px;height:22px;background:var(--border)}
+.ms-wrap{position:relative}
+.ms-trigger{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;background:#f8fafc;color:var(--text);cursor:pointer;min-width:130px;user-select:none;white-space:nowrap}
+.ms-trigger svg{margin-left:auto;flex-shrink:0;transition:transform .15s}
+.ms-trigger.open svg{transform:rotate(180deg)}
+.ms-panel{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.13);z-index:200;min-width:190px;display:none;flex-direction:column}
+.ms-panel.open{display:flex}
+.ms-search-box{padding:7px 10px;border-bottom:1px solid var(--border)}
+.ms-search-box input{width:100%;border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;outline:none}
+.ms-all-row{padding:6px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+.ms-all-row:hover{background:var(--primary-light)}
+.ms-list{overflow-y:auto;max-height:210px}
+.ms-item{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:12px;cursor:pointer}
+.ms-item:hover{background:var(--primary-light)}
+.ms-item input,.ms-all-row input{accent-color:var(--primary);cursor:pointer}
+.ms-count-badge{background:var(--primary);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px}
+.content{padding:14px 16px 40px;max-width:1200px;margin:0 auto}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.stat-card{background:var(--card);border-radius:8px;padding:10px 12px;border:1px solid var(--border);text-align:center;border-top:3px solid var(--primary)}
+.stat-card.green{border-top-color:var(--green)}.stat-card.orange{border-top-color:var(--orange)}
+.stat-label{font-size:10px;color:var(--gray);margin-bottom:4px}
+.stat-val{font-size:18px;font-weight:700}
+.stat-sub{font-size:10px;color:var(--sub);margin-top:2px}
+.card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:14px;margin-bottom:12px}
+.section-title{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.section-title::before{content:'';width:3px;height:13px;background:var(--primary);border-radius:2px;display:inline-block}
+.chart-box{position:relative}
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.s-card{border-radius:8px;padding:12px 14px}
+.s-card .s-title{font-weight:700;font-size:13px}
+.s-card .s-desc{font-size:11px;color:#555;margin:5px 0 8px;line-height:1.5}
+.s-card .s-badge{border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700;color:#fff;margin-left:auto}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;margin:2px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#f8fafc;color:var(--gray);font-weight:600;padding:8px 9px;text-align:center;border-bottom:2px solid var(--border);white-space:nowrap}
+thead th:first-child{text-align:left}
+thead th.sortable{cursor:pointer;user-select:none}
+thead th.sortable:hover{background:#eef2f1;color:var(--primary)}
+.sort-indicator{font-size:10px;margin-left:3px;display:inline-block;width:14px;text-align:center;color:#bbb}
+.sort-indicator.active{color:var(--primary)}
+tbody tr:hover{background:#f8fafc}
+tbody td{padding:7px 9px;border-bottom:1px solid var(--border);text-align:center}
+tbody td:first-child{text-align:left;font-weight:600}
+.no-data{text-align:center;padding:24px;color:var(--gray);font-size:12px}
+.loading{text-align:center;padding:60px 20px;color:var(--gray)}
+.loading-spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.footer-note{text-align:center;font-size:11px;color:#aaa;padding:20px 0 10px;border-top:1px solid var(--border);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>人员能力分析报告</h1>
+    <div class="sub">江西战区 · 个人成本 vs 定单量四象限分析</div>
+  </div>
+  <div class="header-actions">
+    <button class="header-btn" onclick="location.reload()">⟳ 刷新</button>
+    <button class="header-btn" onclick="window.print()">🖨 打印/导出PDF</button>
+    <a href="/" class="header-btn">← 返回看板</a>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <label>所属部门</label>
+  <select class="filter-select" id="pFilterDept" onchange="onDeptChange()">
+    <option value="">全部</option>
+  </select>
+  <div class="filter-sep"></div>
+  <label>门店</label>
+  <div class="ms-wrap">
+    <div class="ms-trigger" id="pMsTrigger" onclick="toggleMsPanel()">
+      <span id="pMsLabel">全部门店</span>
+      <svg viewBox="0 0 10 6" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+    </div>
+    <div class="ms-panel" id="pMsPanel">
+      <div class="ms-search-box"><input type="text" placeholder="搜索门店…" oninput="filterMs(this.value)"></div>
+      <label class="ms-all-row"><input type="checkbox" id="pMsSelectAll" onchange="toggleAll(this)"> 全选</label>
+      <div class="ms-list" id="pMsList"></div>
+    </div>
+  </div>
+  <div class="filter-sep"></div>
+  <label>岗位</label>
+  <div class="ms-wrap">
+    <div class="ms-trigger" id="titleMsTrigger" onclick="toggleTitleMsPanel()">
+      <span id="titleMsLabel">全部岗位</span>
+      <svg viewBox="0 0 10 6" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+    </div>
+    <div class="ms-panel" id="titleMsPanel">
+      <div class="ms-search-box"><input type="text" placeholder="搜索岗位…" oninput="filterTitleMs(this.value)"></div>
+      <label class="ms-all-row"><input type="checkbox" id="titleMsSelectAll" onchange="toggleAllTitles(this)"> 全选</label>
+      <div class="ms-list" id="titleMsList"></div>
+    </div>
+  </div>
+  <button class="filter-select" style="cursor:pointer;background:#fff" onclick="clearFilters()">清除筛选</button>
+  <span style="margin-left:auto;font-size:11px;color:var(--gray)" id="countInfo">加载中…</span>
+</div>
+
+<div class="content" id="app">
+  <div class="loading" id="loadingState">
+    <div class="loading-spinner"></div>
+    <div>加载数据中…</div>
+  </div>
+</div>
+
+<script>
+// ── Personnel sort state ──
+let _personnelSort = { col: '', dir: 1 };
+function sortBy(col) {
+  if (_personnelSort.col === col) _personnelSort.dir *= -1;
+  else { _personnelSort.col = col; _personnelSort.dir = 1; }
+  document.querySelectorAll('.sort-indicator').forEach(el => { el.classList.remove('active'); el.textContent = ''; });
+  ['', '2'].forEach(sfx => {
+    const ind = document.getElementById('pSort-' + col + sfx);
+    if (ind) { ind.classList.add('active'); ind.textContent = _personnelSort.dir === 1 ? '▲' : '▼'; }
+  });
+  filterAndRender();
+}
+
+// ── Multi-select store dropdown ──
+let _allStores = [];
+function getSel() { return [...document.querySelectorAll('#pMsList input:checked')].map(c=>c.value); }
+function syncLabel() {
+  const s=getSel(),l=document.getElementById('pMsLabel');
+  if(!s.length) l.textContent='全部门店';
+  else if(s.length===1) l.textContent=s[0];
+  else l.innerHTML='已选 <span class="ms-count-badge">'+s.length+'</span> 家门店';
+}
+function syncAll() {
+  const a=document.querySelectorAll('#pMsList input'),c=document.querySelectorAll('#pMsList input:checked');
+  const sa=document.getElementById('pMsSelectAll');
+  sa.indeterminate=c.length>0&&c.length<a.length;
+  sa.checked=a.length>0&&c.length===a.length;
+}
+function toggleMsPanel() {
+  const p=document.getElementById('pMsPanel'),t=document.getElementById('pMsTrigger'),o=p.classList.toggle('open');
+  t.classList.toggle('open',o);
+  if(o){document.getElementById('pMsSearch').value='';filterMs('');setTimeout(()=>document.getElementById('pMsSearch')?.focus(),50)}
+}
+function filterMs(q) {
+  q=q.toLowerCase();
+  document.querySelectorAll('#pMsList .ms-item').forEach(i=>{i.style.display=!q||i.dataset.name.toLowerCase().includes(q)?'':'none'});
+}
+function toggleAll(cb) {
+  document.querySelectorAll('#pMsList input').forEach(c=>c.checked=cb.checked);
+  syncLabel();syncAll();filterAndRender();
+}
+document.addEventListener('click',function _msClick(e){
+  const w=document.getElementById('pMsPanel')?.parentElement;
+  if(w&&!w.contains(e.target)){document.getElementById('pMsPanel').classList.remove('open');document.getElementById('pMsTrigger').classList.remove('open')}
+});
+document.addEventListener('click',function _titleClick(e){
+  const w=document.getElementById('titleMsPanel')?.parentElement;
+  if(w&&!w.contains(e.target)){document.getElementById('titleMsPanel').classList.remove('open');document.getElementById('titleMsTrigger').classList.remove('open')}
+});
+
+function popMsDropdown() {
+  const dept=document.getElementById('pFilterDept').value;
+  _allStores=[...new Set(allEmployees.filter(e=>{if(!e.name||e.isIntern)return false;if(dept&&e.dept!==dept)return false;return true}).map(e=>e.store).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh'));
+  const prev=getSel().filter(n=>_allStores.includes(n));
+  document.getElementById('pMsList').innerHTML=_allStores.map(n=>'<label class="ms-item" data-name="'+n+'"><input type="checkbox" value="'+n+'" onchange="syncLabel();syncAll();filterAndRender()"'+(prev.includes(n)?' checked':'')+'> '+n+'</label>').join('');
+  syncLabel();syncAll();
+}
+function onDeptChange() { popMsDropdown(); popTitleMsDropdown(); filterAndRender(); }
+
+// ── Multi-select title dropdown ──
+function getSelTitles() { return [...document.querySelectorAll('#titleMsList input:checked')].map(c=>c.value); }
+function syncTitleLabel() {
+  const s=getSelTitles(),l=document.getElementById('titleMsLabel');
+  if(!s.length) l.textContent='全部岗位';
+  else if(s.length===1) l.textContent=s[0];
+  else l.innerHTML='已选 <span class="ms-count-badge">'+s.length+'</span> 个岗位';
+}
+function syncTitleAll() {
+  const a=document.querySelectorAll('#titleMsList input'),c=document.querySelectorAll('#titleMsList input:checked');
+  const sa=document.getElementById('titleMsSelectAll');
+  sa.indeterminate=c.length>0&&c.length<a.length;
+  sa.checked=a.length>0&&c.length===a.length;
+}
+function toggleTitleMsPanel() {
+  const p=document.getElementById('titleMsPanel'),t=document.getElementById('titleMsTrigger'),o=p.classList.toggle('open');
+  t.classList.toggle('open',o);
+  if(o){document.getElementById('titleMsSearch').value='';filterTitleMs('');setTimeout(()=>document.getElementById('titleMsSearch')?.focus(),50)}
+}
+function filterTitleMs(q) {
+  q=q.toLowerCase();
+  document.querySelectorAll('#titleMsList .ms-item').forEach(i=>{i.style.display=!q||i.dataset.name.toLowerCase().includes(q)?'':'none'});
+}
+function toggleAllTitles(cb) {
+  document.querySelectorAll('#titleMsList input').forEach(c=>c.checked=cb.checked);
+  syncTitleLabel();syncTitleAll();filterAndRender();
+}
+// Close title panel on outside click
+// (handled together with pMsPanel in the listener above)
+
+function popTitleMsDropdown() {
+  const dept=document.getElementById('pFilterDept').value;
+  const stores=getSel();
+  const ALLOWED_TITLES = ['产品专家','产品专员','储备管理','高级产品专家','资深产品专家','零售主管'];
+  const allTitles=[...new Set(allEmployees.filter(e=>{
+    if(!e.name||e.isIntern)return false;
+    if(dept&&e.dept!==dept)return false;
+    if(stores.length&&!stores.includes(e.store))return false;
+    return e.title && ALLOWED_TITLES.includes(e.title);
+  }).map(e=>e.title))].sort((a,b)=>a.localeCompare(b,'zh'));
+  const prev=getSelTitles().filter(n=>allTitles.includes(n));
+  document.getElementById('titleMsList').innerHTML=allTitles.map(n=>'<label class="ms-item" data-name="'+n+'"><input type="checkbox" value="'+n+'" onchange="syncTitleLabel();syncTitleAll();filterAndRender()"'+(prev.includes(n)?' checked':'')+'> '+n+'</label>').join('');
+  syncTitleLabel();syncTitleAll();
+}
+function clearFilters() {
+  document.getElementById('pFilterDept').value='';
+  document.getElementById('pMsList').innerHTML='';
+  document.querySelectorAll('#pMsList input').forEach(c=>c.checked=false);
+  document.getElementById('titleMsList').innerHTML='';
+  document.querySelectorAll('#titleMsList input').forEach(c=>c.checked=false);
+  syncLabel();syncAll();syncTitleLabel();syncTitleAll();popMsDropdown();popTitleMsDropdown();filterAndRender();
+}
+
+function median(arr){if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2}
+const fmt=n=>(n||0).toLocaleString('zh-CN');
+const ALLOWED_TITLES = ['产品专家','产品专员','储备管理','高级产品专家','资深产品专家','零售主管'];
+
+// ── Data ──
+let allEmployees = [];
+let _chart = null;
+const app = document.getElementById('app');
+
+async function loadData() {
+  try {
+    const r=await fetch('/api/months');
+    const months=await r.json();
+    const ym=months[0]||'2026-02';
+    const dr=await fetch('/api/data/'+ym);
+    if(!dr.ok) throw new Error('加载失败');
+    const d=await dr.json();
+    allEmployees=d.employees||[];
+
+    // Populate dept filter
+    const depts=[...new Set(allEmployees.filter(e=>e.dept).map(e=>e.dept))].sort((a,b)=>a.localeCompare(b,'zh'));
+    const df=document.getElementById('pFilterDept');
+    df.innerHTML='<option value="">全部</option>'+depts.map(d=>'<option value="'+d+'">'+d+'</option>').join('');
+
+    document.getElementById('loadingState').style.display='none';
+    popMsDropdown();
+    popTitleMsDropdown();
+    filterAndRender();
+  } catch(e) {
+    document.getElementById('loadingState').innerHTML='<div style="color:var(--red)">加载失败：'+e.message+'<br><br><button class="filter-select" style="cursor:pointer" onclick="location.reload()">重新加载</button></div>';
+  }
+}
+
+function filterAndRender() {
+  const dept=document.getElementById('pFilterDept').value;
+  const stores=getSel();
+  const titles=getSelTitles();
+  const hasTitle=allEmployees.some(e=>e.title);
+
+  let filtered=allEmployees.filter(e=>{
+    if(e.isIntern===true)return false;
+    if(!e.name)return false;
+    if(dept&&e.dept!==dept)return false;
+    if(stores.length&&!stores.includes(e.store))return false;
+    if(titles.length&&!titles.includes(e.title))return false;
+    if(hasTitle&&!titles.length&&(!e.title||!ALLOWED_TITLES.includes(e.title)))return false;
+    return true;
+  });
+
+  document.getElementById('countInfo').textContent='共 '+filtered.length+' 人';
+
+  const points=filtered.map(e=>({
+    id:e.id,name:e.name,title:e.title||'',store:e.store,dept:e.dept,cat:e.cat,
+    x:e.labor||0,y:typeof e.orders==='number'?e.orders:0
+  }));
+  // Sort by selected column, or default by store then name
+  if (_personnelSort.col) {
+    const sc = _personnelSort.col;
+    const dir = _personnelSort.dir;
+    points.sort((a,b) => {
+      let va, vb;
+      if (sc === 'labor') { va = a.x; vb = b.x; }
+      else if (sc === 'orders') { va = a.y; vb = b.y; }
+      else if (sc === 'quadrant') { va = a.q || 0; vb = b.q || 0; }
+      else { va = (a[sc]||'').toString(); vb = (b[sc]||'').toString(); }
+      if (typeof va === 'number') return (va - vb) * dir;
+      return va.localeCompare(vb, 'zh') * dir;
+    });
+  } else {
+    points.sort((a,b)=>(a.store||'').localeCompare(b.store||'')||a.name.localeCompare(b.name));
+  }
+
+  // Stats calculation
+  const totalLabor=filtered.reduce((s,e)=>s+(e.labor||0),0);
+  const totalOrders=filtered.filter(e=>typeof e.orders==='number'&&e.orders>0).reduce((s,e)=>s+e.orders,0);
+  const withOrders=filtered.filter(e=>typeof e.orders==='number'&&e.orders>0).length;
+  const avgCost=filtered.length?Math.round(totalLabor/filtered.length):0;
+  const avgOrders=withOrders?(totalOrders/withOrders).toFixed(1):'—';
+
+  // Build HTML
+  let html='<div class="stats-row">'+
+    '<div class="stat-card"><div class="stat-label">分析人数</div><div class="stat-val">'+filtered.length+'<span style="font-size:12px;color:var(--gray)"> 人</span></div></div>'+
+    '<div class="stat-card green"><div class="stat-label">有定单人数</div><div class="stat-val">'+withOrders+'<span style="font-size:12px;color:var(--gray)"> 人</span></div></div>'+
+    '<div class="stat-card orange"><div class="stat-label">人均成本</div><div class="stat-val">'+fmt(avgCost)+'<span style="font-size:12px;color:var(--gray)"> 元</span></div></div>'+
+    '<div class="stat-card green"><div class="stat-label">人均定单</div><div class="stat-val">'+avgOrders+'<span style="font-size:12px;color:var(--gray)"> 单</span></div></div>'+
+    '</div>';
+
+  const valid=points.filter(p=>p.x>0);
+  if(valid.length>=2) {
+    const medX=median(valid.map(d=>d.x)),medY=median(valid.map(d=>d.y));
+    valid.forEach(d=>{const hc=d.x>medX,ho=d.y>medY;d.q=hc?(ho?2:4):(ho?1:3)});
+    const Q={1:{l:'低成本·高定单',bg:'rgba(0,114,109,0.55)',bo:'#00726D',ab:'rgba(0,114,109,0.06)'},
+             2:{l:'高成本·高定单',bg:'rgba(206,164,114,0.75)',bo:'#b07030',ab:'rgba(206,164,114,0.08)'},
+             3:{l:'低成本·低定单',bg:'rgba(82,120,160,0.55)',bo:'#5278A0',ab:'rgba(82,120,160,0.06)'},
+             4:{l:'高成本·低定单',bg:'rgba(220,38,38,0.6)',bo:'#dc2626',ab:'rgba(220,38,38,0.07)'}};
+
+    html+='<div class="card"><div class="section-title">个人成本 vs 定单量 · 四象限气泡图</div><div class="chart-box" style="height:400px"><canvas id="chartPerson"></canvas></div></div>';
+    app.innerHTML=html;
+    document.getElementById('loadingState')?.remove();
+
+    if(_chart)_chart.destroy();
+    _chart=new Chart(document.getElementById('chartPerson'),{
+      type:'bubble',
+      data:{datasets:[1,2,3,4].map(q=>({label:Q[q].l,data:valid.filter(d=>d.q===q).map(d=>({...d,r:8})),backgroundColor:Q[q].bg,borderColor:Q[q].bo,borderWidth:1.5}))},
+      plugins:[{id:'q',afterDraw(ch){
+        const {ctx,chartArea:{l,r,t,b},scales:{x,y}}=ch;
+        const mx=x.getPixelForValue(medX),my=y.getPixelForValue(medY);
+        ctx.save();
+        [[l,t,mx-l,my-t,1],[mx,t,r-mx,my-t,2],[l,my,mx-l,b-my,3],[mx,my,r-mx,b-my,4]].forEach(([x0,y0,w,h,q])=>{ctx.fillStyle=Q[q].ab;ctx.fillRect(x0,y0,w,h)});
+        ctx.strokeStyle='#bbb';ctx.lineWidth=1;ctx.setLineDash([5,4]);
+        ctx.beginPath();ctx.moveTo(mx,t);ctx.lineTo(mx,b);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(l,my);ctx.lineTo(r,my);ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font='10px sans-serif';ctx.fillStyle='#999';ctx.textAlign='center';
+        ctx.fillText('中位 '+fmt(medX)+'元',mx,b+22);
+        ctx.textAlign='right';ctx.fillText('中位 '+medY+'单',l-4,my+4);
+        ctx.font='bold 10px "PingFang SC",sans-serif';
+        [[Q[1].l,l+5,t+13,'left','rgba(0,114,109,0.75)'],[Q[2].l,r-5,t+13,'right','rgba(160,100,30,0.75)'],
+         [Q[3].l,l+5,b-6,'left','rgba(60,100,150,0.65)'],[Q[4].l,r-5,b-6,'right','rgba(180,30,30,0.75)']]
+        .forEach(([t,x,y,a,c])=>{ctx.fillStyle=c;ctx.textAlign=a;ctx.fillText(t,x,y)});
+        ctx.restore();
+      }}],
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:true,position:'top',labels:{boxWidth:10,font:{size:11},padding:12}},
+          tooltip:{callbacks:{label:ctx=>{const d=ctx.raw;return d.name+' | '+(d.title||'—')+' | '+(d.store||'—')+' | 成本 '+fmt(d.x)+'元 | 定单 '+d.y+'单'}}}},
+        scales:{x:{title:{display:true,text:'个人成本（元）',font:{size:10}},ticks:{callback:v=>fmt(v)}},
+          y:{title:{display:true,text:'个人定单量（单）',font:{size:10}},beginAtZero:true}}}
+    });
+
+    // Summary cards + table built as strings to append after chart
+    const defs=[
+      {q:1,ic:'⭐',ti:'优秀员工 · 低成本高定单',de:'成本控制好且产出突出，是当前的标杆员工，可作经验推广。',co:'#00726D',bg:'rgba(0,114,109,0.06)',bo:'rgba(0,114,109,0.2)'},
+      {q:2,ic:'📈',ti:'核心骨干 · 高成本高定单',de:'产出出色但成本偏高，建议深挖成本结构，优化薪酬配置。',co:'#9a6c20',bg:'rgba(206,164,114,0.1)',bo:'rgba(180,130,50,0.35)'},
+      {q:3,ic:'⚡',ti:'潜力新人 · 低成本低定单',de:'成本可控但单量不足，建议加强培训和订单获取能力。',co:'#3a6898',bg:'rgba(82,120,160,0.07)',bo:'rgba(82,120,160,0.25)'},
+      {q:4,ic:'⚠️',ti:'需关注 · 高成本低定单',de:'高投入低产出，需重点排查，优先制定改善或汰换方案。',co:'#dc2626',bg:'rgba(220,38,38,0.06)',bo:'rgba(220,38,38,0.2)'}
+    ];
+
+    let extra='<div class="summary-grid">'+defs.map(d=>{
+      const ppl=valid.filter(s=>s.q===d.q);
+      const tags=ppl.length?ppl.map(s=>'<span class="tag" style="background:'+d.bg+';border:1px solid '+d.bo+';color:'+d.co+'">'+s.name+'('+s.y+'单/'+fmt(s.x)+'元)</span>').join(''):'<span style="color:#aaa;font-size:11px">暂无员工</span>';
+      return '<div class="s-card" style="background:'+d.bg+';border:1px solid '+d.bo+'">'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="font-size:15px">'+d.ic+'</span>'+
+        '<span class="s-title" style="color:'+d.co+'">'+d.ti+'</span>'+
+        '<span class="s-badge" style="background:'+d.co+'">'+ppl.length+'人</span></div>'+
+        '<div class="s-desc">'+d.de+'</div><div>'+tags+'</div></div>';
+    }).join('')+'</div>';
+
+    extra+='<div class="card"><div class="section-title">人员明细列表</div><div class="table-wrap"><table><thead><tr>'+
+      '<th class="sortable" onclick="sortBy(\'name\')">姓名 <span class="sort-indicator" id="pSort-name"></span></th>'+
+      '<th class="sortable" onclick="sortBy(\'title\')">岗位 <span class="sort-indicator" id="pSort-title"></span></th>'+
+      '<th class="sortable" onclick="sortBy(\'store\')">门店 <span class="sort-indicator" id="pSort-store"></span></th>'+
+      '<th class="sortable" onclick="sortBy(\'dept\')">部门 <span class="sort-indicator" id="pSort-dept"></span></th>'+
+      '<th class="sortable" onclick="sortBy(\'cat\')">分类 <span class="sort-indicator" id="pSort-cat"></span></th>'+
+      '<th class="sortable" onclick="sortBy(\'labor\')">个人成本（元） <span class="sort-indicator" id="pSort-labor"></span></th>'+
+      '<th class="sortable" onclick="sortBy(\'orders\')">定单量（单） <span class="sort-indicator" id="pSort-orders"></span></th>'+
+      '<th class="sortable" onclick="sortBy(\'quadrant\')">象限 <span class="sort-indicator" id="pSort-quadrant"></span></th>'+
+      '</tr></thead><tbody>'+
+      points.map(p=>{
+        const qq=Q[p.q];const ql=qq?qq.l:'—';const qc=qq?qq.bo:'#999';
+        return '<tr><td>'+p.name+'</td><td>'+(p.title||'—')+'</td><td>'+(p.store||'—')+'</td><td>'+(p.dept||'—')+'</td><td>'+(p.cat||'—')+'</td><td>'+fmt(p.x)+'</td><td>'+p.y+'</td><td><span style="color:'+qc+';font-weight:600">'+ql+'</span></td></tr>';
+      }).join('')+'</tbody></table></div></div>';
+
+    extra+='<div class="footer-note">江西战区人力成本分析看板 · 人员能力分析报告 · 数据实时加载</div>';
+    app.insertAdjacentHTML('beforeend', extra);
+  } else {
+    if(!points.length) {
+      html+='<div class="card"><div class="no-data">暂无匹配的员工数据</div></div>';
+    } else {
+      html+='<div class="card"><div class="no-data">数据不足以生成气泡图（至少需要 2 名有成本和定单的员工）</div></div>';
+      html+='<div class="card"><div class="section-title">人员明细列表</div><div class="table-wrap"><table><thead><tr>'+
+        '<th class="sortable" onclick="sortBy(\'name\')">姓名 <span class="sort-indicator" id="pSort-name2"></span></th>'+
+        '<th class="sortable" onclick="sortBy(\'title\')">岗位 <span class="sort-indicator" id="pSort-title2"></span></th>'+
+        '<th class="sortable" onclick="sortBy(\'store\')">门店 <span class="sort-indicator" id="pSort-store2"></span></th>'+
+        '<th class="sortable" onclick="sortBy(\'dept\')">部门 <span class="sort-indicator" id="pSort-dept2"></span></th>'+
+        '<th class="sortable" onclick="sortBy(\'cat\')">分类 <span class="sort-indicator" id="pSort-cat2"></span></th>'+
+        '<th class="sortable" onclick="sortBy(\'labor\')">个人成本（元） <span class="sort-indicator" id="pSort-labor2"></span></th>'+
+        '<th class="sortable" onclick="sortBy(\'orders\')">定单量（单） <span class="sort-indicator" id="pSort-orders2"></span></th>'+
+        '</tr></thead><tbody>'+
+        points.map(p=>'<tr><td>'+p.name+'</td><td>'+(p.title||'—')+'</td><td>'+(p.store||'—')+'</td><td>'+(p.dept||'—')+'</td><td>'+(p.cat||'—')+'</td><td>'+fmt(p.x)+'</td><td>'+p.y+'</td></tr>').join('')+
+        '</tbody></table></div></div>';
+    }
+    html+='<div class="footer-note">江西战区人力成本分析看板 · 人员能力分析报告 · 数据实时加载</div>';
+    app.innerHTML=html;
+    document.getElementById('loadingState')?.remove();
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>

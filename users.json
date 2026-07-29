@@ -1,0 +1,20 @@
+[
+  {
+    "username": "admin",
+    "password": "$2b$10$NKhri5VZsl8X7hUqGiNDUuj7pioaYW7OCOEUiduc.FKp8T0eqyfmG",
+    "role": "admin",
+    "name": "管理员"
+  },
+  {
+    "username": "retail",
+    "password": "$2b$10$zj0Tq5ArdxE4AY3IOfmRcu2wf3N6YyUbXdr83Sd1iBMJyZzbZ2jly",
+    "role": "retail",
+    "name": "零售用户"
+  },
+  {
+    "username": "delivery",
+    "password": "$2b$10$scgCmJEM0iAZlhKR0wbJMOkoGWohUj7SOweYE79s62XBgCAZLt4Hy",
+    "role": "delivery",
+    "name": "交付用户"
+  }
+]

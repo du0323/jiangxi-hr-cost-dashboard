@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: jiangxi-hr-cost-dashboard
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ZONE_NAME
+        value: 江西战区
+      - key: DATA_DIR
+        value: data
+      - key: SESSION_SECRET
+        generateValue: true

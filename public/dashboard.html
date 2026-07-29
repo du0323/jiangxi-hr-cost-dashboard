@@ -1,0 +1,3106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>江西战区人力成本分析看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:#f0f5f4; --card:#fff; --border:#c8d8d6;
+  --primary:#00726D; --primary-light:#e0f2f0; --primary-dark:#002D28;
+  --fixed-color:#00726D; --perf-color:#CEA472;
+  --green:#16a34a; --green-bg:#dcfce7;
+  --red:#dc2626; --red-bg:#fee2e2;
+  --orange:#d97706; --orange-bg:#fef3c7;
+  --gold:#CEA472; --gold-bg:#fdf5eb;
+  --gray:#666666; --text:#333333; --sub:#666666;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:19px;font-weight:700;letter-spacing:.5px}
+.header .sub-info{font-size:11px;opacity:.8;margin-top:2px}
+.period-badge{background:rgba(255,255,255,.2);border-radius:20px;padding:4px 14px;font-size:13px;font-weight:600}
+
+/* IMPORT BAR */
+.import-bar{background:#fff;border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.import-bar .bar-label{font-size:12px;font-weight:600;color:var(--sub);margin-right:2px}
+.import-group{display:flex;align-items:center;gap:6px}
+.import-btn{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:7px;border:1.5px dashed var(--border);background:#f8fafc;cursor:pointer;font-size:12px;font-weight:600;color:var(--gray);transition:all .15s;position:relative;overflow:hidden}
+.import-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.import-btn.loaded{border-style:solid;border-color:var(--green);color:var(--green);background:var(--green-bg)}
+.import-btn.error{border-style:solid;border-color:var(--red);color:var(--red);background:var(--red-bg)}
+.import-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.import-btn svg{flex-shrink:0}
+.tpl-btn{display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:7px;border:1.5px solid #e0e7ff;background:#eef2ff;cursor:pointer;font-size:11px;font-weight:600;color:#4f46e5;transition:all .15s;white-space:nowrap}
+.tpl-btn:hover{background:#e0e7ff;border-color:#6366f1;color:#3730a3}
+.bar-sep{width:1px;height:28px;background:var(--border)}
+.period-info{font-size:12px;color:var(--primary);font-weight:600;background:var(--primary-light);padding:4px 12px;border-radius:14px}
+.import-tip{font-size:11px;color:var(--gray)}
+
+/* KPI CARDS */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:12px 20px 0}
+.kpi-card{background:var(--card);border-radius:10px;padding:12px 14px;border:1px solid var(--border);border-top:3px solid var(--primary)}
+.kpi-card.green{border-top-color:var(--green)}.kpi-card.orange{border-top-color:var(--orange)}.kpi-card.red{border-top-color:var(--red)}
+.kpi-label{font-size:11px;color:var(--gray);font-weight:500;margin-bottom:5px}
+.kpi-value{font-size:21px;font-weight:700;line-height:1}
+.kpi-value span{font-size:12px;font-weight:500;color:var(--gray);margin-left:2px}
+.kpi-sub{font-size:11px;color:var(--sub);margin-top:4px}
+.kpi-badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-green{background:var(--green-bg);color:var(--green)}.badge-red{background:var(--red-bg);color:var(--red)}.badge-orange{background:var(--orange-bg);color:var(--orange)}
+
+/* TABS */
+.tabs-container{padding:12px 20px 0}
+.tab-nav{display:flex;gap:2px;border-bottom:2px solid var(--border)}
+.tab-btn{padding:8px 18px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--gray);border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:6px 6px 0 0;transition:all .15s}
+.tab-btn:hover{background:var(--primary-light);color:var(--primary)}
+.tab-btn.active{color:var(--primary);border-bottom-color:var(--primary);background:var(--primary-light)}
+.tab-panel{display:none;padding:14px 0 24px}.tab-panel.active{display:block}
+
+/* FILTER BAR */
+.filter-bar{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.filter-bar label{font-size:11px;color:var(--gray);font-weight:600;white-space:nowrap}
+.filter-select{padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;background:#f8fafc;color:var(--text);cursor:pointer;min-width:110px}
+.filter-input{padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;width:180px;outline:none}
+.filter-input:focus{border-color:var(--primary)}
+.filter-sep{width:1px;height:22px;background:var(--border)}
+.filter-clear{padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer;color:var(--gray)}
+.filter-clear:hover{color:var(--red);border-color:var(--red)}
+.filter-count{font-size:11px;color:var(--gray);margin-left:auto}
+/* MULTI-SELECT DROPDOWN */
+.ms-wrap{position:relative}
+.ms-trigger{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;background:#f8fafc;color:var(--text);cursor:pointer;min-width:130px;user-select:none;white-space:nowrap}
+.ms-trigger svg{margin-left:auto;flex-shrink:0;transition:transform .15s}
+.ms-trigger.open svg{transform:rotate(180deg)}
+.ms-panel{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.13);z-index:200;min-width:190px;display:none;flex-direction:column}
+.ms-panel.open{display:flex}
+.ms-search-box{padding:7px 10px;border-bottom:1px solid var(--border)}
+.ms-search-box input{width:100%;border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;outline:none}
+.ms-search-box input:focus{border-color:var(--primary)}
+.ms-all-row{padding:6px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+.ms-all-row:hover{background:var(--primary-light)}
+.ms-list{overflow-y:auto;max-height:210px}
+.ms-item{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:12px;cursor:pointer}
+.ms-item:hover{background:var(--primary-light)}
+.ms-item input,.ms-all-row input{accent-color:var(--primary);cursor:pointer;flex-shrink:0}
+.ms-count-badge{background:var(--primary);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px}
+.intern-tag{font-size:9px;color:var(--gray);margin-left:2px;cursor:help;white-space:nowrap}
+
+/* SECTION */
+.section-title{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.section-title::before{content:'';width:3px;height:13px;background:var(--primary);border-radius:2px;display:inline-block}
+.card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:14px;margin-bottom:12px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* SUMMARY CARDS */
+.summary-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
+.s-card{background:var(--card);border-radius:8px;padding:9px 10px;border:1px solid var(--border);text-align:center}
+.s-label{font-size:10px;color:var(--gray);margin-bottom:3px}
+.s-val{font-size:15px;font-weight:700}
+
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#f8fafc;color:var(--gray);font-weight:600;padding:8px 9px;text-align:center;border-bottom:2px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:1}
+thead th:first-child{text-align:left}
+thead th.sortable{cursor:pointer;user-select:none}
+thead th.sortable:hover{background:#eef2f1;color:var(--primary)}
+.sort-indicator{font-size:10px;margin-left:3px;display:inline-block;width:14px;text-align:center;color:#bbb}
+.sort-indicator.active{color:var(--primary)}
+tbody tr:hover{background:#f8fafc}
+tbody td{padding:7px 9px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap}
+tbody td:first-child{text-align:left;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+tbody tr:last-child td{border-bottom:none}
+.total-row td{font-weight:700;background:#f0f9ff;color:var(--primary-dark)}
+.no-data{text-align:center;padding:24px;color:var(--gray);font-size:12px}
+
+/* RATIO BAR */
+.ratio-bar{display:flex;height:13px;border-radius:3px;overflow:hidden;min-width:65px;gap:1px}
+.ratio-fixed{background:var(--fixed-color)}.ratio-perf{background:var(--perf-color)}
+
+/* RATE BADGE */
+.rate{display:inline-block;padding:2px 8px;border-radius:10px;font-weight:700;font-size:11px}
+.rate-exceed{background:#dcfce7;color:#15803d}.rate-good{background:#e0f2f0;color:#00726D}
+.rate-mid{background:#fef3c7;color:#b45309}.rate-low{background:#fee2e2;color:#b91c1c}
+
+/* CHARTS */
+.chart-box{position:relative}
+.chart-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub)}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+
+/* NOTICE */
+.notice{background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:8px 12px;font-size:11px;color:#713f12;margin-bottom:10px}
+
+/* DELIVERY CARDS */
+.delivery-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.store-card{background:var(--card);border-radius:8px;border:1px solid var(--border);padding:14px}
+.store-card h4{font-size:13px;font-weight:700;margin-bottom:10px;color:var(--primary-dark)}
+.metric-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px dashed var(--border)}
+.metric-row:last-child{border-bottom:none}
+.metric-row .label{color:var(--gray);font-size:11px}
+.metric-row .val{font-weight:600;font-size:13px}
+
+/* MONTH BAR */
+.month-bar{background:#fff;border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.month-bar-label{font-size:11px;color:var(--gray);font-weight:600;white-space:nowrap}
+.month-chip{padding:4px 13px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:#f8fafc;color:var(--gray);cursor:pointer;transition:all .15s;white-space:nowrap}
+.month-chip:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.month-chip.active{border-color:var(--primary);background:var(--primary);color:#fff}
+.month-chip .del{margin-left:5px;opacity:.5;font-size:11px;cursor:pointer}
+.month-chip .del:hover{opacity:1;color:var(--red)}
+.month-empty{font-size:11px;color:var(--gray);font-style:italic}
+.manage-btn{padding:4px 11px;border-radius:6px;border:1px solid var(--border);background:#fff;font-size:11px;cursor:pointer;color:var(--gray);margin-left:auto}
+.manage-btn:hover{color:var(--red);border-color:var(--red)}
+
+/* MONTH PICKER */
+.month-picker{display:flex;align-items:center;gap:5px;background:#f0f9ff;border:1.5px solid #bfdbfe;border-radius:8px;padding:5px 10px}
+.month-picker label{font-size:11px;color:var(--primary-dark);font-weight:600;white-space:nowrap}
+.month-picker select{border:none;background:transparent;font-size:12px;font-weight:600;color:var(--primary-dark);cursor:pointer;outline:none;padding:1px 2px}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.show{opacity:1;pointer-events:all}
+.modal{background:#fff;border-radius:12px;padding:24px;min-width:360px;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.2);transform:scale(.95);transition:transform .2s}
+.modal-overlay.show .modal{transform:scale(1)}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text)}
+.modal-month-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:7px;border:1px solid var(--border);margin-bottom:8px}
+.modal-month-row .m-name{font-size:13px;font-weight:600}
+.modal-month-row .m-info{font-size:11px;color:var(--gray)}
+.modal-del-btn{padding:4px 12px;border-radius:6px;border:1px solid var(--red);background:#fff;color:var(--red);font-size:11px;cursor:pointer}
+.modal-del-btn:hover{background:var(--red-bg)}
+.modal-close{margin-top:16px;width:100%;padding:9px;border-radius:8px;border:1px solid var(--border);background:#f8fafc;cursor:pointer;font-size:13px;font-weight:600;color:var(--gray)}
+.modal-close:hover{background:var(--border)}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:10px 18px;border-radius:8px;font-size:12px;z-index:9999;opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{background:var(--green)}.toast.error{background:var(--red)}
+
+/* MOM BADGE */
+.mom-badge{display:inline-flex;align-items:center;gap:1px;font-size:10px;font-weight:700;padding:1px 5px;border-radius:8px;white-space:nowrap;vertical-align:middle}
+.mom-up{background:#fee2e2;color:#dc2626}
+.mom-down{background:#dcfce7;color:#16a34a}
+.mom-flat{background:#f1f5f4;color:#666666}
+
+/* SORTABLE TH */
+.th-sort{cursor:pointer;user-select:none;white-space:nowrap;transition:background .12s}
+.th-sort:hover{background:#e0f2f0;color:var(--primary)}
+.th-sort.active{color:var(--primary);background:#e0f2f0}
+.sort-icon{font-size:9px;margin-left:2px;opacity:.4;vertical-align:middle}
+.th-sort.active .sort-icon{opacity:1}
+
+/* EXPORT BTN */
+.export-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:11px;font-weight:600;color:var(--gray);transition:all .15s;margin-left:auto}
+.export-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+
+/* USER BADGE & LOGOUT */
+.user-info{display:flex;align-items:center;gap:10px}
+.user-name{font-size:12px;opacity:.9}
+.role-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;background:rgba(255,255,255,.2)}
+.logout-btn{padding:5px 13px;border-radius:7px;border:1.5px solid rgba(255,255,255,.4);background:transparent;color:#fff;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
+.logout-btn:hover{background:rgba(255,255,255,.15)}
+
+/* USER MANAGEMENT PANEL */
+.user-panel{background:#fff;border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.user-panel-title{font-size:11px;font-weight:700;color:var(--primary-dark);white-space:nowrap}
+.u-card{display:flex;align-items:center;gap:8px;background:#f8faf9;border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:12px}
+.u-role-tag{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700}
+.tag-admin{background:#e0f2f0;color:#002D28}.tag-retail{background:#fdf5eb;color:#d97706}.tag-delivery{background:#eff6ff;color:#1d4ed8}
+.u-del-btn{padding:2px 8px;border-radius:5px;border:1px solid var(--border);background:#fff;font-size:11px;cursor:pointer;color:var(--gray)}
+.u-del-btn:hover{color:var(--red);border-color:var(--red)}
+.add-user-btn{padding:5px 12px;border-radius:7px;border:1.5px solid var(--primary);background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+.add-user-btn:hover{background:var(--primary);color:#fff}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <h1>江西战区人力成本分析看板</h1>
+    <div class="sub-info">数据来源：实际发放成本 + 定单数据 &nbsp;|&nbsp; 人数口径：不含实习生</div>
+  </div>
+  <div class="user-info">
+    <div class="period-badge" id="periodBadge">—</div>
+    <span class="user-name" id="userNameBadge"></span>
+    <span class="role-badge" id="roleBadge"></span>
+    <button class="logout-btn" style="border-color:rgba(255,255,255,.5)" onclick="offlineExport()">📦 for零售业务</button>
+    <button class="logout-btn" style="border-color:rgba(255,255,255,.5)" onclick="offlineExportFull()">📦 全量信息</button>
+    <button class="logout-btn" onclick="doLogout()">退出</button>
+  </div>
+</div>
+
+<!-- USER MANAGEMENT PANEL (admin only) -->
+<div class="user-panel" id="userPanel" style="display:none">
+  <span class="user-panel-title">👥 账号管理</span>
+  <div id="userList" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  <button class="add-user-btn" onclick="showAddUserModal()">+ 新增账号</button>
+</div>
+
+<!-- IMPORT BAR -->
+<div class="import-bar" id="importBar">
+  <span class="bar-label">数据导入</span>
+
+  <!-- 月份选择器 -->
+  <div class="month-picker">
+    <label>导入至月份</label>
+    <select id="importYear" onchange="syncImportPicker()"></select>
+    <span style="color:var(--primary-dark);font-weight:600">年</span>
+    <select id="importMonth" onchange="syncImportPicker()"></select>
+    <span style="color:var(--primary-dark);font-weight:600">月</span>
+  </div>
+
+  <div class="bar-sep"></div>
+
+  <!-- 成本数据 -->
+  <div class="import-group">
+    <label class="import-btn" id="btnCost">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span id="costLabel">导入成本数据</span>
+      <input type="file" accept=".xlsx,.xls" id="fileCost" onchange="handleCostFile(this)">
+    </label>
+    <button class="tpl-btn" onclick="downloadCostTemplate()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      下载模板
+    </button>
+  </div>
+
+  <div class="bar-sep"></div>
+
+  <!-- 定单数据 -->
+  <div class="import-group">
+    <label class="import-btn" id="btnOrder">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span id="orderLabel">导入定单数据</span>
+      <input type="file" accept=".xlsx,.xls" id="fileOrder" onchange="handleOrderFile(this)">
+    </label>
+    <button class="tpl-btn" onclick="downloadOrderTemplate()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      下载模板
+    </button>
+  </div>
+
+  <!-- 个人定单数据 -->
+  <div class="import-group">
+    <label class="import-btn" id="btnPersonal">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span id="personalLabel">导入个人定单数据</span>
+      <input type="file" accept=".xlsx,.xls" id="filePersonal" onchange="handlePersonalOrderFile(this)">
+    </label>
+    <button class="tpl-btn" onclick="downloadPersonalOrderTemplate()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      下载模板
+    </button>
+  </div>
+
+  <div class="bar-sep"></div>
+  <span class="import-tip">支持 .xlsx 格式，导入后自动保存至所选月份</span>
+</div>
+
+<!-- MONTH BAR -->
+<div class="month-bar" id="monthBarEl">
+  <span class="month-bar-label">查看月份</span>
+  <div id="monthChips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+  <button class="manage-btn" onclick="openManageModal()">管理数据</button>
+</div>
+
+<!-- MANAGE MODAL -->
+<div class="modal-overlay" id="manageModal" onclick="if(event.target===this)closeManageModal()">
+  <div class="modal">
+    <h3>📅 已存储月份数据</h3>
+    <div id="modalContent"></div>
+    <button class="modal-close" onclick="closeManageModal()">关闭</button>
+  </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-row">
+  <div class="kpi-card"><div class="kpi-label">战区总人工成本</div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-sub" id="kpiTotalSub">—</div></div>
+  <div class="kpi-card"><div class="kpi-label">战区在编人数</div><div class="kpi-value" id="kpiCount">—</div><div class="kpi-sub" id="kpiCountSub">—</div></div>
+  <div class="kpi-card orange"><div class="kpi-label">战区固浮比（固定:绩效）</div><div class="kpi-value" id="kpiRatio">—</div><div class="kpi-sub" id="kpiRatioSub">—</div></div>
+  <div class="kpi-card green"><div class="kpi-label">零售定单达成</div><div class="kpi-value" id="kpiOrder">—</div><div class="kpi-sub" id="kpiOrderSub">—</div></div>
+  <div class="kpi-card"><div class="kpi-label">零售人均总成本</div><div class="kpi-value" id="kpiAvg">—</div><div class="kpi-sub" id="kpiAvgSub">—</div></div>
+</div>
+
+<!-- TABS -->
+<div class="tabs-container">
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('overview')">综合概览</button>
+    <button class="tab-btn" onclick="switchTab('retail')">零售明细</button>
+    <button class="tab-btn" onclick="switchTab('delivery')">交付明细</button>
+    <button class="tab-btn" onclick="switchTab('personnel')">人员明细</button>
+    <button class="tab-btn" onclick="switchTab('annual')">年度汇总</button>
+  </div>
+
+  <!-- ======= 综合概览 ======= -->
+  <div class="tab-panel active" id="tab-overview">
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-title">零售 vs 交付 固浮比对比</div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--fixed-color)"></div>固定成本</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--perf-color)"></div>绩效成本</div>
+        </div>
+        <div class="chart-box" style="height:190px"><canvas id="chartFixedPerf"></canvas></div>
+        <div style="margin-top:8px;font-size:11px;color:var(--gray)">※ 基准固浮比建议：固定40% / 绩效60%</div>
+      </div>
+      <div class="card">
+        <div class="section-title">战区成本结构占比</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;height:190px">
+          <div class="chart-box"><canvas id="chartPie1"></canvas></div>
+          <div class="chart-box"><canvas id="chartPie2"></canvas></div>
+        </div>
+        <div style="display:flex;justify-content:space-around;font-size:11px;color:var(--gray);margin-top:6px">
+          <span>零售 vs 交付</span><span>固定 vs 绩效</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">战区分模块成本汇总</div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>模块</th><th>人数</th><th>本月人工成本</th><th>上月人工成本</th><th>环比</th>
+        <th>固定成本</th><th>绩效成本</th><th>固浮比</th><th>人均总成本</th>
+      </tr></thead><tbody id="overviewTbody"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="section-title">零售门店人工成本对比（固定 vs 绩效）</div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--fixed-color)"></div>固定成本</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--perf-color)"></div>绩效成本</div>
+      </div>
+      <div class="chart-box" style="height:350px"><canvas id="chartStoreCost"></canvas></div>
+    </div>
+    <div class="card" id="momCompareCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="section-title" style="margin:0">与上月环比对比</div>
+        <span id="momPrevLabel" style="font-size:11px;color:var(--gray)"></span>
+      </div>
+      <div id="momNoPrev" style="text-align:center;padding:24px;color:var(--gray);font-size:12px">暂无上月数据，导入后即可自动对比</div>
+      <div id="momChartWrap" style="display:none">
+        <div class="chart-box" style="height:240px"><canvas id="chartMoM"></canvas></div>
+        <div id="momDeltaRow" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= 零售明细 ======= -->
+  <div class="tab-panel" id="tab-retail">
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+      <label>所属部门</label>
+      <select class="filter-select" id="filterDept" onchange="filterState.names=[];msSetSelected([]);applyFilters()">
+        <option value="">全部</option>
+      </select>
+      <div class="filter-sep"></div>
+      <label>门店</label>
+      <div class="ms-wrap" id="storeMultiWrap">
+        <div class="ms-trigger" id="msTrigger" onclick="toggleMsPanel()">
+          <span id="msLabel">全部门店</span>
+          <svg viewBox="0 0 10 6" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+        </div>
+        <div class="ms-panel" id="msPanel">
+          <div class="ms-search-box"><input type="text" placeholder="搜索门店…" id="msSearch" oninput="filterMsOptions(this.value)"></div>
+          <label class="ms-all-row"><input type="checkbox" id="msSelectAll" onchange="msToggleAll(this)"> 全选</label>
+          <div class="ms-list" id="msList"></div>
+        </div>
+      </div>
+      <div class="filter-sep"></div>
+      <label>达成状态</label>
+      <select class="filter-select" id="filterRate" onchange="applyFilters()" style="min-width:100px">
+        <option value="">全部</option>
+        <option value="exceed">超额完成 ≥100%</option>
+        <option value="good">达标 85-100%</option>
+        <option value="mid">偏低 70-85%</option>
+        <option value="low">未达标 &lt;70%</option>
+      </select>
+      <button class="filter-clear" onclick="clearFilters()">清除筛选</button>
+      <span class="filter-count" id="filterCount"></span>
+    </div>
+
+    <!-- KPI summary -->
+    <div class="summary-row" id="retailSummaryRow"></div>
+
+    <div class="notice" id="retailNotice"></div>
+
+    <!-- RETAIL TABLE -->
+    <div class="card">
+      <div class="section-title" id="retailTableTitle">
+        零售门店综合分析
+        <button class="export-btn" onclick="exportRetailTable()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导出 Excel
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table><thead id="retailThead"></thead>
+        <tbody id="retailTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SUPPLEMENTAL COST TABLE -->
+    <div class="card" style="margin-top:12px">
+      <div class="section-title">补充成本明细（含环比）
+        <button class="export-btn" onclick="exportCostTable()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导出 Excel
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table><thead id="costThead"></thead>
+        <tbody id="costTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-title">门店定单达成分析</div>
+        <div class="chart-box" style="height:300px"><canvas id="chartOrderRate"></canvas></div>
+      </div>
+      <div class="card" id="chartCostDistCard">
+        <div class="section-title">人均总成本分布</div>
+        <div class="chart-box" style="height:300px"><canvas id="chartCostDist"></canvas></div>
+      </div>
+    </div>
+
+    <!-- QUADRANT CHART -->
+    <div class="card" style="margin-top:0">
+      <div class="section-title">人效 vs 人均总成本 · 四象限分析</div>
+      <div class="chart-box" style="height:420px"><canvas id="chartEffCost"></canvas></div>
+      <div id="quadrantSummary"></div>
+    </div>
+
+    <!-- SUPPORT TABLE -->
+    <div class="card" id="retailSupportCard">
+      <div class="section-title">零售战区级支持部门</div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>部门</th><th>人数</th><th>人工成本</th><th>固定成本</th><th>绩效成本</th><th>固浮比</th><th>人均总成本</th>
+      </tr></thead><tbody id="supportTbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ======= 交付明细 ======= -->
+  <div class="tab-panel" id="tab-delivery">
+    <div class="summary-row" style="grid-template-columns:repeat(4,1fr)" id="deliverySummaryRow"></div>
+    <div class="delivery-compare" id="deliveryCards"></div>
+    <div class="card" style="margin-top:12px">
+      <div class="section-title">两大交付中心对比</div>
+      <div class="chart-box" style="height:250px"><canvas id="chartDelivery"></canvas></div>
+      <div id="deliveryInsight" style="margin-top:10px;padding:10px;background:#f0f9ff;border-radius:6px;font-size:11px;color:var(--sub)"></div>
+    </div>
+    <div class="card" id="deliverySupportCard">
+      <div class="section-title">交付战区级（管理人员）</div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>类别</th><th>人数</th><th>人工成本</th><th>固定成本</th><th>绩效成本</th><th>固浮比</th><th>人均总成本</th>
+      </tr></thead><tbody id="deliverySupportTbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ======= 人员明细 ======= -->
+  <div class="tab-panel" id="tab-personnel">
+    <div class="filter-bar">
+      <label>所属部门</label>
+      <select class="filter-select" id="pFilterDept" onchange="populatePersonnelStoreDropdown();populatePersonnelTitleDropdown();renderPersonnel()">
+        <option value="">全部</option>
+      </select>
+      <div class="filter-sep"></div>
+      <label>门店</label>
+      <div class="ms-wrap">
+        <div class="ms-trigger" id="pMsTrigger" onclick="pToggleMsPanel()">
+          <span id="pMsLabel">全部门店</span>
+          <svg viewBox="0 0 10 6" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+        </div>
+        <div class="ms-panel" id="pMsPanel">
+          <div class="ms-search-box"><input type="text" placeholder="搜索门店…" id="pMsSearch" oninput="pFilterMsOptions(this.value)"></div>
+          <label class="ms-all-row"><input type="checkbox" id="pMsSelectAll" onchange="pMsToggleAll(this)"> 全选</label>
+          <div class="ms-list" id="pMsList"></div>
+        </div>
+      </div>
+      <div class="filter-sep"></div>
+      <label>岗位</label>
+      <div class="ms-wrap">
+        <div class="ms-trigger" id="pTitleMsTrigger" onclick="pToggleTitleMsPanel()">
+          <span id="pTitleMsLabel">全部岗位</span>
+          <svg viewBox="0 0 10 6" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+        </div>
+        <div class="ms-panel" id="pTitleMsPanel">
+          <div class="ms-search-box"><input type="text" placeholder="搜索岗位…" id="pTitleMsSearch" oninput="pFilterTitleMsOptions(this.value)"></div>
+          <label class="ms-all-row"><input type="checkbox" id="pTitleMsSelectAll" onchange="pTitleMsToggleAll(this)"> 全选</label>
+          <div class="ms-list" id="pTitleMsList"></div>
+        </div>
+      </div>
+      <div class="filter-sep"></div>
+      <button class="filter-clear" onclick="clearPersonnelFilters()">清除筛选</button>
+    </div>
+    <div class="card">
+      <div class="section-title">个人成本 vs 定单量 四象限分析</div>
+      <div class="chart-box" style="height:400px"><canvas id="chartPersonnel"></canvas></div>
+    </div>
+    <div id="personnelQuadrantSummary"></div>
+    <div class="card">
+      <div class="section-title">人员明细列表</div>
+      <div class="table-wrap"><table><thead><tr>
+        <th class="sortable" data-pcol="name" onclick="personnelSortBy('name')">姓名 <span class="sort-indicator" id="pSort-name"></span></th>
+        <th class="sortable" data-pcol="title" onclick="personnelSortBy('title')">岗位 <span class="sort-indicator" id="pSort-title"></span></th>
+        <th class="sortable" data-pcol="store" onclick="personnelSortBy('store')">门店 <span class="sort-indicator" id="pSort-store"></span></th>
+        <th class="sortable" data-pcol="dept" onclick="personnelSortBy('dept')">部门 <span class="sort-indicator" id="pSort-dept"></span></th>
+        <th class="sortable" data-pcol="cat" onclick="personnelSortBy('cat')">分类 <span class="sort-indicator" id="pSort-cat"></span></th>
+        <th class="sortable" data-pcol="labor" onclick="personnelSortBy('labor')">个人成本（元） <span class="sort-indicator" id="pSort-labor"></span></th>
+        <th class="sortable" data-pcol="orders" onclick="personnelSortBy('orders')">定单量（单） <span class="sort-indicator" id="pSort-orders"></span></th>
+        <th class="sortable" data-pcol="quadrant" onclick="personnelSortBy('quadrant')">象限 <span class="sort-indicator" id="pSort-quadrant"></span></th>
+      </tr></thead><tbody id="personnelTbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ======= 年度汇总 ======= -->
+  <div class="tab-panel" id="tab-annual">
+    <div id="annualContent">
+      <div style="text-align:center;padding:40px;color:var(--gray);font-size:13px">加载中…</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ==============================================
+// DEFAULT DATA (2月)
+// ==============================================
+const DEFAULT_RETAIL_STORES = [
+  {name:'江西长泰零售中心',dept:'江西一部',labor:333062,fixed:224261,perf:108801,count:10,overtime_legal:27966,travel:300,social:87204,orders_actual:36,orders_target:40},
+  {name:'江西静安大融城零售中心',dept:'江西一部',labor:250688,fixed:179188,perf:71500,count:9,overtime_legal:25931,travel:500,social:73427,orders_actual:26,orders_target:25},
+  {name:'江西凯德虹口零售中心',dept:'江西一部',labor:231507,fixed:165086,perf:66421,count:7,overtime_legal:21724,travel:0,social:68329,orders_actual:23,orders_target:22},
+  {name:'江西南翔印象城零售中心',dept:'江西一部',labor:217020,fixed:156120,perf:60900,count:7,overtime_legal:24000,travel:600,social:58729,orders_actual:17,orders_target:28},
+  {name:'江西中海环宇城Max零售中心',dept:'江西一部',labor:223568,fixed:167951,perf:55617,count:7,overtime_legal:34759,travel:300,social:53507,orders_actual:18,orders_target:18},
+  {name:'江西嘉亭荟零售中心',dept:'江西一部',labor:124520,fixed:105850,perf:18670,count:6,overtime_legal:17655,travel:300,social:27564,orders_actual:8,orders_target:16},
+  {name:'江西中信泰富万达零售中心',dept:'江西一部',labor:119052,fixed:100832,perf:18220,count:5,overtime_legal:18759,travel:600,social:31198,orders_actual:8,orders_target:17},
+  {name:'江西前滩LPLAZA零售中心',dept:'江西二部',labor:252333,fixed:194475,perf:57858,count:10,overtime_legal:27448,travel:300,social:71767,orders_actual:23,orders_target:32},
+  {name:'江西松江手拉手汽车港零售中心',dept:'江西二部',labor:292043,fixed:221866,perf:70177,count:10,overtime_legal:40828,travel:400,social:71234,orders_actual:23,orders_target:32},
+  {name:'江西长宁来福士零售中心',dept:'江西二部',labor:248044,fixed:184300,perf:63744,count:9,overtime_legal:17655,travel:300,social:78273,orders_actual:24,orders_target:32},
+  {name:'江西虹桥天地零售中心',dept:'江西二部',labor:203035,fixed:155070,perf:47965,count:7,overtime_legal:18759,travel:1300,social:56625,orders_actual:12,orders_target:20},
+  {name:'江西龙华会零售中心',dept:'江西二部',labor:165371,fixed:125054,perf:40317,count:6,overtime_legal:12690,travel:300,social:44396,orders_actual:12,orders_target:20},
+  {name:'江西南丰城零售中心',dept:'江西二部',labor:157330,fixed:122260,perf:35070,count:6,overtime_legal:25241,travel:300,social:42529,orders_actual:13,orders_target:20},
+  {name:'江西闵行龙湖天街零售中心（外展店）',dept:'江西二部',labor:102065,fixed:86305,perf:15760,count:4,overtime_legal:17103,travel:400,social:28632,orders_actual:6,orders_target:12},
+  {name:'江西松江印象城零售中心（外展店）',dept:'江西二部',labor:166728,fixed:119720,perf:47008,count:6,overtime_legal:24276,travel:300,social:31030,orders_actual:19,orders_target:19},
+];
+const DEFAULT_SUPPORT = [
+  {name:'区域获客',labor:198854,fixed:167194,perf:31660,count:5},
+  {name:'零售运营',labor:142749,fixed:123753,perf:18996,count:3},
+  {name:'销售策略',labor:142791,fixed:130127,perf:12664,count:2},
+  {name:'江西一部（战区级）',labor:62660,fixed:38654,perf:24006,count:1},
+  {name:'江西二部（战区级）',labor:75086,fixed:51805,perf:23281,count:1},
+  {name:'江西战区总部（负责人）',labor:86161,fixed:79829,perf:6332,count:1},
+];
+const DEFAULT_DELIVERY_STORES = [
+  {name:'江西青浦交付中心',labor:346643,fixed:255260,perf:91383,count:16,overtime_legal:8069,travel:300,social:89538},
+  {name:'江西浦东交付中心',labor:330516,fixed:210587,perf:119929,count:13,overtime_legal:4414,travel:0,social:81041},
+];
+const DEFAULT_DELIVERY_SUPPORT = [
+  {name:'交付战区级管理',labor:33578,fixed:27246,perf:6332,count:1},
+];
+const DEFAULT_PERIOD = '2026年2月';
+
+// ==============================================
+// API-BASED STORAGE (server-side)
+// ==============================================
+const DEFAULT_YM = '2026-02';
+let currentYM = DEFAULT_YM;
+let importYM = DEFAULT_YM;
+let allMonthKeys = [];  // populated on init
+let monthDataCache = {}; // {ym: data}
+let currentUser = null;  // {username, role, name}
+
+async function apiFetch(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  if (r.status === 401) { window.location.href = '/'; return null; }
+  return r;
+}
+
+async function apiGetMonths() {
+  const r = await apiFetch('/api/months');
+  if (!r) return [];
+  allMonthKeys = await r.json();
+  return allMonthKeys;
+}
+
+async function apiGetData(ym) {
+  if (monthDataCache[ym]) return monthDataCache[ym];
+  const r = await apiFetch(`/api/data/${ym}`);
+  if (!r || !r.ok) return null;
+  const d = await r.json();
+  monthDataCache[ym] = d;
+  return d;
+}
+
+async function apiSaveData(ym, data) {
+  monthDataCache[ym] = data; // update cache
+  const r = await apiFetch(`/api/data/${ym}`, { method:'POST', body: JSON.stringify(data) });
+  if (!r || !r.ok) throw new Error(r ? `服务器拒绝(${r.status})` : '无响应');
+}
+
+async function apiDeleteData(ym) {
+  delete monthDataCache[ym];
+  await apiFetch(`/api/data/${ym}`, { method:'DELETE' });
+}
+
+function sortedMonthKeys() { return [...allMonthKeys]; }
+
+function nextMonthAfterLatest() {
+  if (!allMonthKeys.length) return DEFAULT_YM;
+  const [y, m] = allMonthKeys[0].split('-').map(Number);
+  const nm = m === 12 ? 1 : m + 1;
+  const ny = m === 12 ? y + 1 : y;
+  return `${ny}-${String(nm).padStart(2,'0')}`;
+}
+
+// ==============================================
+// STATE
+// ==============================================
+let state = { period:'—', retailStores:[], supportDepts:[], deliveryStores:[], deliverySupport:[], employees:[] };
+let charts = {};
+let filterState = { dept:'', names:[], rate:'' };
+let sortState = { field: null, dir: -1 };
+let sortCostState = { field: null, dir: -1 };
+let _annualRows = [];   // cached for export
+let _annualYtd = null;
+
+// ==============================================
+// HELPERS
+// ==============================================
+const fmt = n => (n||0).toLocaleString('zh-CN');
+const fmtW = n => ((n||0)/10000).toFixed(1);
+
+// MoM helpers
+function getPrevYM(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const pm = m === 1 ? 12 : m - 1;
+  const py = m === 1 ? y - 1 : y;
+  return `${py}-${String(pm).padStart(2,'0')}`;
+}
+function getPrevData() { return monthDataCache[getPrevYM(currentYM)] || null; }
+function momBadge(curr, prev, costMode=true) {
+  if (prev == null || prev === 0 || curr == null) return '<span style="color:var(--gray);font-size:10px">—</span>';
+  const pct = (curr - prev) / Math.abs(prev) * 100;
+  if (Math.abs(pct) < 0.05) return `<span class="mom-badge mom-flat">持平</span>`;
+  const up = pct > 0;
+  const bad = costMode ? up : !up;
+  return `<span class="mom-badge ${bad?'mom-up':'mom-down'}">${up?'↑':'↓'}${Math.abs(pct).toFixed(1)}%</span>`;
+}
+function rateClass(r) {
+  if (r==null) return '';
+  if (r>=1) return 'rate rate-exceed';
+  if (r>=0.85) return 'rate rate-good';
+  if (r>=0.7) return 'rate rate-mid';
+  return 'rate rate-low';
+}
+function fixedBadge(fp) {
+  const col = fp>70?'var(--red)':fp>60?'var(--orange)':'var(--green)';
+  return `<div style="display:flex;align-items:center;gap:5px;justify-content:center">
+    <div class="ratio-bar"><div class="ratio-fixed" style="width:${fp}%"></div><div class="ratio-perf" style="width:${100-fp}%"></div></div>
+    <span style="font-weight:700;font-size:11px;color:${col}">${fp}%</span></div>`;
+}
+function sum(arr,f){return arr.reduce((a,b)=>a+(b[f]||0),0)}
+function showToast(msg, type='success') {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show '+type;
+  setTimeout(()=>t.className='toast',2500);
+}
+function normalizeStoreName(name) {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/\(/g, '（')
+    .replace(/\)/g, '）')
+    .replace(/（外展店）/g, '');
+}
+function buildOrderStoreIndex(orderMap) {
+  const index = {};
+  const ambiguous = new Set();
+  Object.entries(orderMap || {}).forEach(([name, value]) => {
+    const key = normalizeStoreName(name);
+    if (!key) return;
+    if (index[key] && index[key].sourceName !== name) {
+      delete index[key];
+      ambiguous.add(key);
+      return;
+    }
+    if (!ambiguous.has(key)) index[key] = { ...value, sourceName: name };
+  });
+  return { index, ambiguous };
+}
+function collectEmployeeOrdersById(data) {
+  const ordersById = {};
+  (data.employees || []).forEach(emp => {
+    const id = String(emp.id || '').trim();
+    if (!id || emp.orders == null) return;
+    ordersById[id] = { id, name: String(emp.name || '').trim(), orders: emp.orders };
+  });
+  Object.values(data._pendingEmployeeOrders || {}).forEach(entry => {
+    const id = String((entry && entry.id) || '').trim();
+    if (!id || entry.orders == null) return;
+    ordersById[id] = { id, name: String(entry.name || '').trim(), orders: entry.orders };
+  });
+  return ordersById;
+}
+function applyEmployeeOrders(employees, ordersById) {
+  const remaining = { ...ordersById };
+  (employees || []).forEach(emp => {
+    const id = String(emp.id || '').trim();
+    if (!id || !remaining[id]) return;
+    emp.orders = remaining[id].orders;
+    delete remaining[id];
+  });
+
+  const employeeNameCounts = {};
+  const pendingNameCounts = {};
+  (employees || []).forEach(emp => {
+    const name = String(emp.name || '').trim();
+    if (!name) return;
+    employeeNameCounts[name] = (employeeNameCounts[name] || 0) + 1;
+  });
+  Object.values(remaining).forEach(entry => {
+    const name = String((entry && entry.name) || '').trim();
+    if (!name) return;
+    pendingNameCounts[name] = (pendingNameCounts[name] || 0) + 1;
+  });
+
+  Object.entries(remaining).forEach(([id, entry]) => {
+    const name = String((entry && entry.name) || '').trim();
+    if (!name || employeeNameCounts[name] !== 1 || pendingNameCounts[name] !== 1) return;
+    const target = (employees || []).find(emp => String(emp.name || '').trim() === name && emp.orders == null);
+    if (!target) return;
+    target.orders = entry.orders;
+    delete remaining[id];
+  });
+
+  return remaining;
+}
+
+// ==============================================
+// PARSE EXCEL FILES
+// ==============================================
+function handleCostFile(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+      const result = processCostData(rows);
+      if(!result) {
+        const preview = rows.slice(0,3).map(r=>(r||[]).slice(0,8).join(' | ')).join('  →  ');
+        showToast(`格式有误：未找到"人工成本"列。前3行预览：${preview}`, 'error');
+        setBtnError('btnCost','costLabel','格式错误');
+        return;
+      }
+      const existing = monthDataCache[importYM] || {};
+      const newData = {
+        period: result.period || ymToLabel(importYM),
+        retailStores: result.retailStores,
+        supportDepts: result.supportDepts,
+        deliveryStores: result.deliveryStores,
+        deliverySupport: result.deliverySupport,
+        employees: result.employees || [],
+      };
+      if (existing.retailStores) {
+        newData.retailStores.forEach(s => {
+          const prev = existing.retailStores.find(p => p.name === s.name);
+          if (prev && prev.orders_actual != null) { s.orders_actual = prev.orders_actual; s.orders_target = prev.orders_target; }
+        });
+      }
+      if (existing.deliveryTotal != null) newData.deliveryTotal = existing.deliveryTotal;
+
+      const remainingOrders = applyEmployeeOrders(newData.employees, collectEmployeeOrdersById(existing));
+      if (Object.keys(remainingOrders).length) newData._pendingEmployeeOrders = remainingOrders;
+
+      await apiSaveData(importYM, newData);
+      if (!allMonthKeys.includes(importYM)) { allMonthKeys.unshift(importYM); allMonthKeys.sort().reverse(); }
+      currentYM = importYM;
+      state = JSON.parse(JSON.stringify(newData));
+      renderMonthBar();
+      setBtnLoaded('btnCost','costLabel', file.name);
+      showToast(`成本数据已保存至 ${ymToLabel(importYM)}（${result.employees ? result.employees.length : rows.length-1} 条记录）`);
+      renderAll();
+    } catch(err) { showToast('导入失败：'+err.message,'error'); setBtnError('btnCost','costLabel','导入失败'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function handleOrderFile(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+      const orderResult = processOrderData(rows);
+      if(!orderResult) { showToast('定单数据格式有误','error'); setBtnError('btnOrder','orderLabel','格式错误'); return; }
+      const { map: orderMap, deliveryTotal } = orderResult;
+      const monthData = monthDataCache[importYM] || { period: ymToLabel(importYM), retailStores:[], supportDepts:[], deliveryStores:[], deliverySupport:[], employees:[] };
+      const { index: orderIndex, ambiguous } = buildOrderStoreIndex(orderMap);
+      let unmatched = 0;
+      let ambiguousCount = 0;
+      monthData.retailStores.forEach(s => {
+        const key = normalizeStoreName(s.name);
+        if (ambiguous.has(key)) {
+          s.orders_actual = null;
+          s.orders_target = null;
+          ambiguousCount++;
+          return;
+        }
+        const match = orderIndex[key];
+        if (match) {
+          s.orders_actual = match.actual;
+          s.orders_target = match.target;
+        } else {
+          s.orders_actual = null;
+          s.orders_target = null;
+          unmatched++;
+        }
+      });
+      if(deliveryTotal != null) monthData.deliveryTotal = deliveryTotal;
+      await apiSaveData(importYM, monthData);
+      currentYM = importYM;
+      state = JSON.parse(JSON.stringify(monthData));
+      renderMonthBar();
+      setBtnLoaded('btnOrder','orderLabel', file.name);
+      let message = `定单数据已保存至 ${ymToLabel(importYM)}`;
+      if (unmatched || ambiguousCount) {
+        message += `（未匹配 ${unmatched} 家`;
+        if (ambiguousCount) message += `，重名冲突 ${ambiguousCount} 家`;
+        message += '）';
+      }
+      showToast(message, unmatched || ambiguousCount ? 'error' : 'success');
+      renderAll();
+    } catch(err) { showToast('导入失败：'+err.message,'error'); setBtnError('btnOrder','orderLabel','导入失败'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setBtnLoaded(btnId, labelId, filename) {
+  document.getElementById(btnId).className='import-btn loaded';
+  document.getElementById(labelId).textContent='✓ '+filename.substring(0,16)+(filename.length>16?'…':'');
+}
+function setBtnError(btnId, labelId, msg) {
+  document.getElementById(btnId).className='import-btn error';
+  document.getElementById(labelId).textContent='✗ '+msg;
+}
+
+function processCostData(rows) {
+  // Auto-detect header row (scan first 5 rows for the one containing '人工成本')
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    if (rows[i] && rows[i].some(h => h && String(h).includes('人工成本'))) {
+      headerIdx = i; break;
+    }
+  }
+  if (headerIdx < 0) {
+    // Fallback: try to find row with '二级部门' or '所属周期'
+    for (let i = 0; i < Math.min(5, rows.length); i++) {
+      if (rows[i] && rows[i].some(h => h && (String(h).includes('二级部门') || String(h).includes('所属周期')))) {
+        headerIdx = i; break;
+      }
+    }
+  }
+  if (headerIdx < 0) return null;
+  const header = rows[headerIdx];
+  if(!header) return null;
+  // Find column indices by name
+  const ci = (name) => header.findIndex(h=>h&&String(h).includes(name));
+  // Try to find dept columns dynamically, fallback to positional
+  let iD2 = ci('二级部门'); if(iD2<0) iD2=0;
+  let iD3 = ci('三级部门'); if(iD3<0) iD3=1;
+  let iD4 = ci('四级部门'); if(iD4<0) iD4=2;
+  const iId=ci('工号'), iName=ci('姓名'), iTitle=ci('职务（岗位）'),
+        iLabor=ci('人工成本'), iPerfB=ci('店端绩效奖金'), iQ=ci('季度奖金应发'),
+        iOT=ci('法定加班费'), iTrv=ci('出差津贴'), iSoc=ci('社保公积金（企业）'),
+        iAccr=ci('奖金计提'), iCar=ci('二手车置换奖金'), iCount=ci('是否计数'),
+        iPeriod=ci('所属周期');
+  if(iLabor<0) return null;
+
+  // Detect period
+  let period = null;
+  for(let i=headerIdx+1;i<rows.length;i++) {
+    if(rows[i][iPeriod]) { const p=String(rows[i][iPeriod]); if(p.match(/\d{4}\/\d{2}/)) { period=formatPeriod(p); break; } }
+  }
+
+  function classify(d3,d4) {
+    const s4=String(d4||''), s3=String(d3||'');
+    if(s4.includes('零售中心')||s4.includes('零售展厅')) return '零售';
+    if(s4.includes('交付中心')) return '交付';
+    if(!d4&&s3==='交付') return '交付';
+    return '零售';
+  }
+  function getStore(d3,d4) {
+    if(d4&&d4!==null) return String(d4).trim();
+    if(d3&&d3!==null) return String(d3).trim();
+    return (window._zoneName || '江西战区') + '总部';
+  }
+  function getDept(d3,d4) { return d4?String(d3||''):'战区直属'; }
+
+  const stores={}, employees=[];
+  rows.slice(headerIdx+1).filter(r=>r[iD2]).forEach(r=>{
+    const d3=r[iD3],d4=r[iD4];
+    const cat=classify(d3,d4), store=getStore(d3,d4), dept=getDept(d3,d4);
+    const isStore=!!(d4&&d4!==null);
+    const notCounted = String(r[iCount]) !== '是';
+    const title = iTitle >= 0 ? String(r[iTitle]||'').trim() : '';
+    const isIntern = notCounted && title === '实习生';  // 是否计数=否 且 岗位=实习生 才算实习生
+    if(!stores[store]) stores[store]={
+      cat,dept,isStore,
+      labor:0,perf_bonus:0,q_bonus:0,accrual:0,car_bonus:0,overtime_legal:0,travel:0,social:0,
+      count:0,          // 在编人数（不含实习生）
+      intern_count:0,   // 实习生人数
+      intern_labor:0    // 实习生人力成本（已计入 labor）
+    };
+    const s=stores[store];
+    // 人力成本：所有人（含实习生）
+    s.labor+=Number(r[iLabor])||0;
+    s.perf_bonus+=Number(r[iPerfB])||0;
+    s.q_bonus+=Number(r[iQ])||0;
+    s.overtime_legal+=Number(r[iOT])||0;
+    s.travel+=Number(r[iTrv])||0;
+    s.social+=Number(r[iSoc])||0;
+    s.accrual+=Number(r[iAccr])||0;
+    s.car_bonus+=Number(r[iCar])||0;
+    // 人数 & 人效：实习生（是否计数=否 且 岗位=实习生）单独计，其余均计入在编
+    if (isIntern) {
+      s.intern_count++;
+      s.intern_labor += Number(r[iLabor])||0;
+    } else {
+      s.count++;
+    }
+    // 个人员工记录
+    employees.push({
+      id:       iId>=0   ? String(r[iId]||'').trim()   : '',
+      name:     iName>=0 ? String(r[iName]||'').trim() : '',
+      title,
+      store, dept, cat,
+      labor:    Number(r[iLabor])||0,
+      isIntern,   // 实习生标记，个人定单计算时需排除
+      orders:   null
+    });
+  });
+
+  const retailStores=[], deliveryStores=[], supportDepts=[], deliverySupport=[];
+  Object.entries(stores).forEach(([name,s])=>{
+    const perf=s.perf_bonus+s.q_bonus+s.accrual+s.car_bonus;
+    const fixed=s.labor-perf;
+    const obj={
+      name, dept:s.dept,
+      labor:Math.round(s.labor), fixed:Math.round(fixed), perf:Math.round(perf),
+      count:s.count,                            // 在编人数（不含实习生）
+      intern_count:s.intern_count,              // 实习生人数（人力成本已含在 labor 中）
+      intern_labor:Math.round(s.intern_labor),  // 实习生成本额
+      overtime_legal:Math.round(s.overtime_legal), travel:Math.round(s.travel),
+      social:Math.round(s.social), orders_actual:null, orders_target:null
+    };
+    if(s.cat==='零售'&&s.isStore) retailStores.push(obj);
+    else if(s.cat==='交付'&&s.isStore) deliveryStores.push({...obj});
+    else if(s.cat==='零售') supportDepts.push({...obj});
+    else deliverySupport.push({...obj});
+  });
+  return {retailStores,supportDepts,deliveryStores,deliverySupport,period,employees};
+}
+
+function processOrderData(rows) {
+  if(!rows||rows.length<2) return null;
+  const map={};
+  let deliveryTotal = null;
+  rows.slice(1).forEach(r=>{
+    if(!r[0]) return;
+    const name = String(r[0]).trim();
+    if(!name || name==='总计') return;
+    if(name==='交付量总计' || name==='交付量合计') { deliveryTotal=Number(r[1])||0; return; }
+    map[name]={actual:Number(r[1])||0, target:Number(r[2])||0};
+  });
+  return Object.keys(map).length>0 ? {map, deliveryTotal} : null;
+}
+
+function formatPeriod(p) {
+  const m=p.match(/(\d{4})\/(\d{2})/);
+  if(!m) return p;
+  const months='一二三四五六七八九十十一十二'.split('');
+  return m[1]+'年'+parseInt(m[2])+'月';
+}
+function updatePeriod() {
+  document.getElementById('periodBadge').textContent=state.period;
+  const pi=document.getElementById('periodInfo');
+  if(pi) pi.textContent='当前数据：'+state.period;
+}
+
+// ==============================================
+// MULTI-SELECT STORE DROPDOWN
+// ==============================================
+let _msAllStores = []; // full list for current dept
+
+function getMsSelected() {
+  return [...document.querySelectorAll('#msList input[type=checkbox]:checked')].map(cb => cb.value);
+}
+function msSetSelected(names) {
+  document.querySelectorAll('#msList input[type=checkbox]').forEach(cb => {
+    cb.checked = names.includes(cb.value);
+  });
+  msSyncLabel();
+  msSyncSelectAll();
+}
+function msSyncLabel() {
+  const sel = getMsSelected();
+  const lbl = document.getElementById('msLabel');
+  if (!sel.length) { lbl.textContent = '全部门店'; }
+  else if (sel.length === 1) { lbl.textContent = sel[0]; }
+  else { lbl.innerHTML = `已选 <span class="ms-count-badge">${sel.length}</span> 家门店`; }
+}
+function msSyncSelectAll() {
+  const all = document.querySelectorAll('#msList input[type=checkbox]');
+  const checked = document.querySelectorAll('#msList input[type=checkbox]:checked');
+  const sa = document.getElementById('msSelectAll');
+  sa.indeterminate = checked.length > 0 && checked.length < all.length;
+  sa.checked = all.length > 0 && checked.length === all.length;
+}
+function toggleMsPanel() {
+  const panel = document.getElementById('msPanel');
+  const trigger = document.getElementById('msTrigger');
+  const isOpen = panel.classList.toggle('open');
+  trigger.classList.toggle('open', isOpen);
+  if (isOpen) { document.getElementById('msSearch').value=''; filterMsOptions(''); document.getElementById('msSearch').focus(); }
+}
+function closeMsPanel() {
+  document.getElementById('msPanel').classList.remove('open');
+  document.getElementById('msTrigger').classList.remove('open');
+}
+function filterMsOptions(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#msList .ms-item').forEach(item => {
+    item.style.display = !q || item.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+function msToggleAll(cb) {
+  document.querySelectorAll('#msList input[type=checkbox]').forEach(c => { c.checked = cb.checked; });
+  msSyncLabel();
+  applyFilters();
+}
+function populateStoreDropdown() {
+  // Update dept options from actual data
+  const deptSel = document.getElementById('filterDept');
+  const curDept = deptSel.value;
+  const deptNames = [...new Set(state.retailStores.map(s => s.dept).filter(d => d))].sort();
+  deptSel.innerHTML = '<option value="">全部</option>' +
+    deptNames.map(d => `<option value="${d}"${d===curDept?' selected':''}>${d}</option>`).join('');
+
+  const dept = deptSel.value;
+  _msAllStores = state.retailStores
+    .filter(s => !dept || s.dept === dept)
+    .map(s => s.name)
+    .sort((a, b) => a.localeCompare(b, 'zh'));
+  const prevSelected = getMsSelected().filter(n => _msAllStores.includes(n));
+  const list = document.getElementById('msList');
+  list.innerHTML = _msAllStores.map(n =>
+    `<label class="ms-item" data-name="${n}">
+      <input type="checkbox" value="${n}" onchange="msSyncLabel();msSyncSelectAll();applyFilters()"${prevSelected.includes(n)?' checked':''}> ${n}
+    </label>`
+  ).join('');
+  msSyncLabel();
+  msSyncSelectAll();
+}
+// Close panel when clicking outside
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('storeMultiWrap');
+  if (wrap && !wrap.contains(e.target)) closeMsPanel();
+  const pWrap = document.getElementById('pMsPanel')?.parentElement;
+  if (pWrap && !pWrap.contains(e.target)) pCloseMsPanel();
+  const pTitleWrap = document.getElementById('pTitleMsPanel')?.parentElement;
+  if (pTitleWrap && !pTitleWrap.contains(e.target)) pCloseTitleMsPanel();
+});
+
+// ==============================================
+// FILTER
+// ==============================================
+function applyFilters() {
+  filterState.dept = document.getElementById('filterDept').value;
+  filterState.names = getMsSelected();
+  filterState.rate = document.getElementById('filterRate').value;
+  renderRetailTable();
+  renderRetailCharts();
+}
+function clearFilters() {
+  document.getElementById('filterDept').value='';
+  document.getElementById('filterRate').value='';
+  filterState={dept:'',names:[],rate:''};
+  msSetSelected([]);
+  renderRetailTable();
+  renderRetailCharts();
+}
+function getFilteredStores() {
+  return state.retailStores.filter(s=>{
+    if(filterState.dept && s.dept!==filterState.dept) return false;
+    if(filterState.names.length && !filterState.names.includes(s.name)) return false;
+    if(filterState.rate) {
+      const r = s.orders_actual!=null&&s.orders_target>0 ? s.orders_actual/s.orders_target : null;
+      if(filterState.rate==='exceed'&&!(r!=null&&r>=1)) return false;
+      if(filterState.rate==='good'&&!(r!=null&&r>=0.85&&r<1)) return false;
+      if(filterState.rate==='mid'&&!(r!=null&&r>=0.7&&r<0.85)) return false;
+      if(filterState.rate==='low'&&!(r!=null&&r<0.7)) return false;
+    }
+    return true;
+  });
+}
+
+// ==============================================
+// RENDER ALL
+// ==============================================
+function renderAll() {
+  updatePeriod();
+  renderKPIs();
+  renderOverview();
+  renderRetailSummary();
+  renderRetailTable();
+  renderRetailCharts();
+  renderSupportTable();
+  renderDelivery();
+  renderPersonnel();
+}
+
+// ==============================================
+// KPI
+// ==============================================
+function renderKPIs() {
+  const rs=state.retailStores, ss=state.supportDepts, ds=state.deliveryStores, dss=state.deliverySupport;
+  const allRetail=[...rs,...ss], allDelivery=[...ds,...dss];
+  const totalLabor=sum([...allRetail,...allDelivery],'labor');
+  const totalCount=sum([...allRetail,...allDelivery],'count');
+  const totalFixed=sum([...allRetail,...allDelivery],'fixed');
+  const retailLabor=sum(allRetail,'labor'), retailCount=sum(allRetail,'count');
+  const deliveryLabor=sum(allDelivery,'labor'), deliveryCount=sum(allDelivery,'count');
+  const fixedRatio=(totalFixed/totalLabor*100).toFixed(1);
+  const totalActual=rs.reduce((a,s)=>a+(s.orders_actual||0),0);
+  const totalTarget=rs.reduce((a,s)=>a+(s.orders_target||0),0);
+  const orderRate=totalTarget>0?(totalActual/totalTarget*100).toFixed(1):'—';
+  const avgCost=retailCount>0?(retailLabor/retailCount/10000).toFixed(2):'—';
+  const storeCount=rs.filter(s=>s.count>0).reduce((a,s)=>a+s.count,0);
+  const humanEff=storeCount>0?(totalActual/storeCount).toFixed(2):'—';
+
+  // Prev month
+  const prev = getPrevData();
+  const pAll = prev ? [...(prev.retailStores||[]),...(prev.supportDepts||[]),...(prev.deliveryStores||[]),...(prev.deliverySupport||[])] : null;
+  const pRetail = prev ? [...(prev.retailStores||[]),...(prev.supportDepts||[])] : null;
+  const pTotalLabor = pAll ? sum(pAll,'labor') : null;
+  const pRetailLabor = pRetail ? sum(pRetail,'labor') : null;
+  const pTotalCount = pAll ? sum(pAll,'count') : null;
+  const pFixed = pAll ? sum(pAll,'fixed') : null;
+  const pFixedRatio = pFixed && pTotalLabor ? (pFixed/pTotalLabor*100) : null;
+  const pActual = prev ? (prev.retailStores||[]).reduce((a,s)=>a+(s.orders_actual||0),0) : null;
+  const pTarget = prev ? (prev.retailStores||[]).reduce((a,s)=>a+(s.orders_target||0),0) : null;
+  const pOrderRate = (pTarget && pTarget>0) ? pActual/pTarget*100 : null;
+  const pRetailCount = pRetail ? sum(pRetail,'count') : null;
+  const pAvgCost = (pRetailCount && pRetailLabor) ? pRetailLabor/pRetailCount : null;
+
+  document.getElementById('kpiTotal').innerHTML=fmtW(totalLabor)+'<span>万元</span>';
+  document.getElementById('kpiTotalSub').innerHTML=`零售 ${fmtW(retailLabor)}万 / 交付 ${fmtW(deliveryLabor)}万 ${momBadge(totalLabor,pTotalLabor)}`;
+  document.getElementById('kpiCount').innerHTML=totalCount+'<span>人</span>';
+  document.getElementById('kpiCountSub').innerHTML=`零售 ${retailCount}人 / 交付 ${deliveryCount}人 ${momBadge(totalCount,pTotalCount)}`;
+  document.getElementById('kpiRatio').innerHTML=fixedRatio+'<span>%</span>';
+  document.getElementById('kpiRatioSub').innerHTML=`基准40:60 &nbsp;<span class="kpi-badge badge-${fixedRatio>70?'red':fixedRatio>60?'orange':'green'}">${fixedRatio>70?'固定偏高':fixedRatio>60?'偏高':'合理'}</span> ${pFixedRatio!=null?momBadge(parseFloat(fixedRatio),pFixedRatio):''}`;
+  document.getElementById('kpiOrder').innerHTML=(orderRate==='—'?'—':orderRate+'<span>%</span>');
+  document.getElementById('kpiOrderSub').innerHTML=`实际 ${totalActual}单 / 目标 ${totalTarget}单 ${pOrderRate!=null?momBadge(parseFloat(orderRate),pOrderRate,false):''}`;
+  document.getElementById('kpiAvg').innerHTML=(avgCost==='—'?'—':avgCost+'<span>万元/人</span>');
+  document.getElementById('kpiAvgSub').innerHTML=`零售人效 ${humanEff}单/人（店端）${pAvgCost!=null?momBadge(retailCount>0?retailLabor/retailCount:0,pAvgCost):''}`;
+}
+
+// ==============================================
+// OVERVIEW
+// ==============================================
+function renderOverview() {
+  const rs=state.retailStores, ss=state.supportDepts, ds=state.deliveryStores, dss=state.deliverySupport;
+  const allRetail=[...rs,...ss], allDelivery=[...ds,...dss];
+  const rL=sum(allRetail,'labor'),rF=sum(allRetail,'fixed'),rP=sum(allRetail,'perf'),rC=sum(allRetail,'count');
+  const dL=sum(allDelivery,'labor'),dF=sum(allDelivery,'fixed'),dP=sum(allDelivery,'perf'),dC=sum(allDelivery,'count');
+  const tL=rL+dL,tF=rF+dF,tP=rP+dP,tC=rC+dC;
+
+  // Dept-level breakdown — derive dept names from actual data
+  const retailDeptNames = [...new Set(rs.map(s => s.dept).filter(d => d))].sort();
+  const d1name = retailDeptNames[0] || '一部';
+  const d2name = retailDeptNames[1] || '二部';
+  const d1=rs.filter(s=>s.dept===d1name), d2=rs.filter(s=>s.dept===d2name);
+  const d1L=sum(d1,'labor'),d1F=sum(d1,'fixed'),d1P=sum(d1,'perf'),d1C=sum(d1,'count');
+  const d2L=sum(d2,'labor'),d2F=sum(d2,'fixed'),d2P=sum(d2,'perf'),d2C=sum(d2,'count');
+  const ssL=sum(ss,'labor'),ssF=sum(ss,'fixed'),ssP=sum(ss,'perf'),ssC=sum(ss,'count');
+  const dsL=sum(ds,'labor'),dsF=sum(ds,'fixed'),dsP=sum(ds,'perf'),dsC=sum(ds,'count');
+  const dssL=sum(dss,'labor'),dssF=sum(dss,'fixed'),dssP=sum(dss,'perf'),dssC=sum(dss,'count');
+
+  // Prev month breakdown
+  const prev = getPrevData();
+  const pr = prev ? prev.retailStores||[] : [];
+  const ps = prev ? prev.supportDepts||[] : [];
+  const pd = prev ? prev.deliveryStores||[] : [];
+  const pds = prev ? prev.deliverySupport||[] : [];
+  const pd1L = prev ? sum(pr.filter(s=>s.dept===d1name),'labor') : null;
+  const pd2L = prev ? sum(pr.filter(s=>s.dept===d2name),'labor') : null;
+  const pssL = prev ? sum(ps,'labor') : null;
+  const pdsL = prev ? sum(pd,'labor') : null;
+  const pdssL = prev ? sum(pds,'labor') : null;
+  const prL = prev ? sum([...pr,...ps],'labor') : null;
+  const pdL = prev ? sum([...pd,...pds],'labor') : null;
+  const ptL = prev ? (prL+pdL) : null;
+
+  function row(indent, label, L, F, P, C, pL, isTot=false) {
+    const fp=C>0?(F/L*100).toFixed(1):'-';
+    const col=fp>70?'var(--red)':fp>60?'var(--orange)':'var(--green)';
+    const cls=isTot?'class="total-row"':'';
+    const avg=C>0?fmt(Math.round(L/C)):'-';
+    return `<tr ${cls}>
+      <td style="padding-left:${indent}px">${label}</td><td>${C}</td>
+      <td>${fmt(L)}</td>
+      <td style="color:var(--gray)">${pL!=null?fmt(pL):'—'}</td>
+      <td>${pL!=null?momBadge(L,pL):''}</td>
+      <td style="color:var(--fixed-color)">${fmt(F)}</td>
+      <td style="color:var(--perf-color)">${fmt(P)}</td>
+      <td>${fp!=='-'?`<div style="display:flex;align-items:center;gap:5px;justify-content:center">
+        <div class="ratio-bar"><div class="ratio-fixed" style="width:${fp}%"></div><div class="ratio-perf" style="width:${100-fp}%"></div></div>
+        <span style="font-weight:700;font-size:11px;color:${col}">${fp}%</span></div>`:'-'}</td>
+      <td>${avg}</td></tr>`;
+  }
+
+  document.getElementById('overviewTbody').innerHTML =
+    row(9, '🏪 零售（含战区级）', rL,rF,rP,rC, prL, true) +
+    row(20, d1name+'（门店）', d1L,d1F,d1P,d1C, pd1L) +
+    row(20, d2name+'（门店）', d2L,d2F,d2P,d2C, pd2L) +
+    row(20, '零售战区支持', ssL,ssF,ssP,ssC, pssL) +
+    row(9, '🚗 交付（含战区级）', dL,dF,dP,dC, pdL, true) +
+    row(20, '交付门店', dsL,dsF,dsP,dsC, pdsL) +
+    row(20, '交付战区支持', dssL,dssF,dssP,dssC, pdssL) +
+    row(9, '📊 ' + (window._zoneName||'战区') + '合计', tL,tF,tP,tC, ptL, true);
+
+  // Charts
+  destroyChart('chartFixedPerf');
+  charts.chartFixedPerf = new Chart(document.getElementById('chartFixedPerf'), {
+    type:'bar', data:{
+      labels:['零售（含战区级）','交付（含战区级）','战区合计'],
+      datasets:[
+        {label:'固定成本',data:[rF,dF,tF],backgroundColor:'#00726D',borderRadius:3},
+        {label:'绩效成本',data:[rP,dP,tP],backgroundColor:'#CEA472',borderRadius:3}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>v/10000+'万'}}}}
+  });
+
+  destroyChart('chartPie1');
+  charts.chartPie1 = new Chart(document.getElementById('chartPie1'), {
+    type:'doughnut', data:{labels:['零售','交付'],datasets:[{data:[rL,dL],backgroundColor:['#00726D','#002D28'],borderWidth:1}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}
+  });
+
+  destroyChart('chartPie2');
+  charts.chartPie2 = new Chart(document.getElementById('chartPie2'), {
+    type:'doughnut', data:{labels:['固定成本','绩效成本'],datasets:[{data:[tF,tP],backgroundColor:['#00726D','#CEA472'],borderWidth:1}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}
+  });
+
+  const sorted=[...rs].sort((a,b)=>b.labor-a.labor);
+  destroyChart('chartStoreCost');
+  charts.chartStoreCost = new Chart(document.getElementById('chartStoreCost'), {
+    type:'bar', data:{
+      labels:sorted.map(s=>s.name.replace('零售中心','').replace('（外展店）','[外展]').substring(0,12)),
+      datasets:[
+        {label:'固定成本',data:sorted.map(s=>s.fixed),backgroundColor:'#00726D',borderRadius:3},
+        {label:'绩效成本',data:sorted.map(s=>s.perf),backgroundColor:'#CEA472',borderRadius:3}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10},maxRotation:45}},
+        y:{stacked:true,ticks:{callback:v=>v/10000+'万'}}}}
+  });
+
+  renderMomChart();
+}
+
+// ==============================================
+// MOM COMPARISON CHART
+// ==============================================
+function renderMomChart() {
+  const prev = getPrevData();
+  const noPrev = document.getElementById('momNoPrev');
+  const wrap = document.getElementById('momChartWrap');
+  const prevLabel = document.getElementById('momPrevLabel');
+
+  if (!prev) {
+    noPrev.style.display='block'; wrap.style.display='none';
+    prevLabel.textContent='';
+    return;
+  }
+  noPrev.style.display='none'; wrap.style.display='block';
+  prevLabel.textContent=`对比：${ymToLabel(getPrevYM(currentYM))}`;
+
+  const cur=state, allCur=[...cur.retailStores,...cur.supportDepts,...cur.deliveryStores,...cur.deliverySupport];
+  const allPrev=[...(prev.retailStores||[]),...(prev.supportDepts||[]),...(prev.deliveryStores||[]),...(prev.deliverySupport||[])];
+
+  const dept = (arr, d) => arr.filter(s=>s.dept===d);
+  const rd = [...new Set(cur.retailStores.map(s=>s.dept).filter(d=>d))].sort();
+  const data = [
+    { label:(rd[0]||'一部')+'（门店）', cur:sum(dept(cur.retailStores,rd[0]),'labor'), prev:sum(dept(prev.retailStores||[],rd[0]),'labor') },
+    { label:(rd[1]||'二部')+'（门店）', cur:sum(dept(cur.retailStores,rd[1]),'labor'), prev:sum(dept(prev.retailStores||[],rd[1]),'labor') },
+    { label:'零售战区支持',     cur:sum(cur.supportDepts,'labor'),                  prev:sum(prev.supportDepts||[],'labor') },
+    { label:'交付门店',         cur:sum(cur.deliveryStores,'labor'),                prev:sum(prev.deliveryStores||[],'labor') },
+    { label:'交付战区支持',     cur:sum(cur.deliverySupport,'labor'),               prev:sum(prev.deliverySupport||[],'labor') },
+  ];
+
+  destroyChart('chartMoM');
+  charts.chartMoM = new Chart(document.getElementById('chartMoM'), {
+    type:'bar',
+    data:{
+      labels: data.map(d=>d.label),
+      datasets:[
+        {label:state.period, data:data.map(d=>d.cur), backgroundColor:'#00726D', borderRadius:4, barPercentage:0.4},
+        {label:ymToLabel(getPrevYM(currentYM)), data:data.map(d=>d.prev), backgroundColor:'#99c4c2', borderRadius:4, barPercentage:0.4}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:10}}},
+      scales:{x:{grid:{display:false}}, y:{ticks:{callback:v=>v/10000+'万'}}}
+    }
+  });
+
+  // Delta cards
+  document.getElementById('momDeltaRow').innerHTML = data.map(d=>{
+    const delta = d.prev>0 ? ((d.cur-d.prev)/d.prev*100) : null;
+    const up = delta>0, bad = up;
+    const cls = delta==null?'mom-flat':Math.abs(delta)<0.05?'mom-flat':bad?'mom-up':'mom-down';
+    const arrow = delta==null?'—':up?'↑':'↓';
+    const pct = delta!=null ? Math.abs(delta).toFixed(1)+'%' : '—';
+    const diff = d.prev>0 ? (d.cur-d.prev) : null;
+    return `<div style="background:#f8faf9;border:1px solid var(--border);border-radius:8px;padding:9px 12px;text-align:center">
+      <div style="font-size:11px;color:var(--gray);margin-bottom:4px">${d.label}</div>
+      <div style="font-size:14px;font-weight:700"><span class="mom-badge ${cls}" style="font-size:12px">${arrow}${pct}</span></div>
+      <div style="font-size:10px;color:var(--gray);margin-top:3px">${diff!=null?(diff>0?'+':'')+Math.round(diff/10000).toFixed(1)+'万':'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ==============================================
+// RETAIL SUMMARY
+// ==============================================
+function renderRetailSummary() {
+  const rs=state.retailStores, ss=state.supportDepts;
+  const allR=[...rs,...ss];
+  const L=sum(allR,'labor'), F=sum(allR,'fixed'), P=sum(allR,'perf'), C=sum(allR,'count');
+  const actual=rs.reduce((a,s)=>a+(s.orders_actual||0),0);
+  const target=rs.reduce((a,s)=>a+(s.orders_target||0),0);
+  const rate=target>0?(actual/target*100).toFixed(1)+'%':'—';
+  document.getElementById('retailSummaryRow').innerHTML = `
+    <div class="s-card"><div class="s-label">零售总人工成本</div><div class="s-val" style="color:var(--primary)">${fmtW(L)}<small style="font-size:11px">万</small></div></div>
+    <div class="s-card"><div class="s-label">零售总固定成本</div><div class="s-val" style="color:var(--fixed-color)">${fmtW(F)}<small style="font-size:11px">万</small></div></div>
+    <div class="s-card"><div class="s-label">零售总绩效成本</div><div class="s-val" style="color:var(--perf-color)">${fmtW(P)}<small style="font-size:11px">万</small></div></div>
+    <div class="s-card"><div class="s-label">零售在编人数</div><div class="s-val" style="color:var(--primary)">${C}<small style="font-size:11px">人</small></div></div>
+    <div class="s-card"><div class="s-label">实际定单</div><div class="s-val" style="color:var(--green)">${actual}<small style="font-size:11px">单</small></div></div>
+    <div class="s-card"><div class="s-label">定单达成率</div><div class="s-val" style="color:var(--orange)">${rate}</div></div>`;
+
+  // Notice
+  const missingCost = rs.filter(s=>s.orders_actual!=null&&s.orders_actual>0); // all have cost, some may lack orders
+  const missingOrder = rs.filter(s=>s.orders_actual==null);
+  let notice = `<strong>数据说明：</strong>共 ${rs.length} 家门店有成本数据`;
+  if(missingOrder.length>0) notice += `；其中 ${missingOrder.length} 家暂无定单数据`;
+  document.getElementById('retailNotice').innerHTML = notice;
+}
+
+// ==============================================
+// RETAIL TABLE
+// ==============================================
+const RETAIL_COLS = [
+  { label:'门店',         field:'name',          type:'str'  },
+  { label:'所属',         field:'dept',          type:'str'  },
+  { label:'人数',         field:'count',         type:'num'  },
+  { label:'人工成本',     field:'labor',         type:'num'  },
+  { label:'环比',         field:null,            type:null   },
+  { label:'固定成本',     field:'fixed',         type:'num'  },
+  { label:'绩效成本',     field:'perf',          type:'num'  },
+  { label:'固浮比',       field:'fp',            type:'num'  },
+  { label:'人均固定成本', field:'avg_fixed',     type:'num'  },
+  { label:'人均变动成本', field:'avg_perf',      type:'num'  },
+  { label:'定单实际',     field:'orders_actual', type:'num'  },
+  { label:'定单目标',     field:'orders_target', type:'num'  },
+  { label:'达成率',       field:'rate',          type:'num'  },
+  { label:'人均总成本',   field:'avg',           type:'num'  },
+  { label:'人效(单/人)',  field:'eff',           type:'num'  },
+  { label:'人力CPS',      field:'cps',           type:'num'  },
+];
+
+function storeVal(s, field) {
+  if (field==='fp')        return s.labor>0 ? s.fixed/s.labor : 0;
+  if (field==='rate')      return (s.orders_actual!=null&&s.orders_target>0) ? s.orders_actual/s.orders_target : -1;
+  if (field==='avg')       return s.count>0 ? s.labor/s.count : 0;
+  if (field==='avg_fixed') return s.count>0 ? s.fixed/s.count : 0;
+  if (field==='avg_perf')  return s.count>0 ? s.perf/s.count : 0;
+  if (field==='eff')       return (s.count>0&&s.orders_actual!=null) ? s.orders_actual/s.count : -1;
+  if (field==='cps')       return s.orders_actual>0 ? s.labor/s.orders_actual : Infinity;
+  return s[field] ?? (typeof s[field]==='string' ? '' : 0);
+}
+
+function sortRetail(field) {
+  if (sortState.field === field) { sortState.dir *= -1; }
+  else { sortState.field = field; sortState.dir = -1; }
+  renderRetailTable();
+}
+
+function getSortedStores(arr) {
+  if (!sortState.field) return arr;
+  const f = sortState.field;
+  return [...arr].sort((a, b) => {
+    const va = storeVal(a, f), vb = storeVal(b, f);
+    if (typeof va === 'string') return sortState.dir * va.localeCompare(vb, 'zh');
+    return sortState.dir * (va - vb);
+  });
+}
+
+function renderRetailTable() {
+  populateStoreDropdown();
+  const filtered = getFilteredStores();
+  const sorted = getSortedStores(filtered);
+  const tbody = document.getElementById('retailTbody');
+  document.getElementById('filterCount').textContent = `显示 ${filtered.length} / ${state.retailStores.length} 家门店`;
+
+  // Render sortable header
+  const si = f => {
+    if (!f) return '';
+    if (sortState.field !== f) return '<span class="sort-icon">⇅</span>';
+    return `<span class="sort-icon">${sortState.dir===1?'↑':'↓'}</span>`;
+  };
+  document.getElementById('retailThead').innerHTML = '<tr>' +
+    RETAIL_COLS.map(c => c.field
+      ? `<th class="th-sort${sortState.field===c.field?' active':''}" onclick="sortRetail('${c.field}')">${c.label}${si(c.field)}</th>`
+      : `<th>${c.label}</th>`
+    ).join('') + '</tr>';
+
+  const prev = getPrevData();
+  const prevStoreMap = {};
+  if (prev && prev.retailStores) prev.retailStores.forEach(s => { prevStoreMap[s.name] = s; });
+
+  if(sorted.length===0) { tbody.innerHTML=`<tr><td colspan="16" class="no-data">暂无符合条件的门店</td></tr>`; renderRetailCostTable(sorted, prevStoreMap); return; }
+
+  let html='', tot={labor:0,fixed:0,perf:0,count:0,intern_count:0,ot:0,trv:0,soc:0,actual:0,target:0};
+  const _deptOrder = [...new Set(sorted.map(s=>s.dept))];
+  sorted.forEach(s=>{
+    const fp=parseFloat((s.fixed/s.labor*100).toFixed(1));
+    const r=s.orders_actual!=null&&s.orders_target>0?s.orders_actual/s.orders_target:null;
+    const eff=s.count>0&&s.orders_actual!=null?(s.orders_actual/s.count).toFixed(2):'-';
+    const cps=s.orders_actual>0?Math.round(s.labor/s.orders_actual):null;
+    const avgFixed=s.count>0?fmt(Math.round(s.fixed/s.count)):'-';
+    const avgPerf=s.count>0?fmt(Math.round(s.perf/s.count)):'-';
+    const bg=_deptOrder.indexOf(s.dept)%2===0?'#f0f7f7':'#f6f9f6';
+    const pStore = prevStoreMap[s.name];
+    const momCell = pStore ? momBadge(s.labor, pStore.labor) : '<span style="color:var(--gray);font-size:10px">—</span>';
+    tot.labor+=s.labor; tot.fixed+=s.fixed; tot.perf+=s.perf; tot.count+=s.count;
+    tot.intern_count+=(s.intern_count||0);
+    tot.ot+=s.overtime_legal||0; tot.trv+=s.travel||0; tot.soc+=s.social||0;
+    if(s.orders_actual!=null){tot.actual+=s.orders_actual; tot.target+=s.orders_target;}
+    html+=`<tr style="background:${bg}">
+      <td title="${s.name}">${s.name.replace('零售中心','').replace('（外展店）','<small style="color:var(--gray)">外展</small>')}</td>
+      <td style="color:var(--gray)">${s.dept}</td>
+      <td>${s.intern_count ? `<strong>${s.count}</strong><span title="含${s.intern_count}名实习生成本，不计入人数及人效" class="intern-tag">(+${s.intern_count}习)</span>` : `<strong>${s.count}</strong>`}</td>
+      <td>${fmt(s.labor)}</td><td>${momCell}</td>
+      <td style="color:var(--fixed-color)">${fmt(s.fixed)}</td><td style="color:var(--perf-color)">${fmt(s.perf)}</td>
+      <td>${fixedBadge(fp)}</td>
+      <td style="color:var(--fixed-color)">${avgFixed}</td><td style="color:var(--perf-color)">${avgPerf}</td>
+      <td><strong>${s.orders_actual!=null?s.orders_actual:'-'}</strong></td>
+      <td>${s.orders_target!=null?s.orders_target:'-'}</td>
+      <td>${r!=null?`<span class="${rateClass(r)}">${(r*100).toFixed(1)}%</span>`:'<span style="color:var(--gray)">—</span>'}</td>
+      <td>${s.count>0?fmt(Math.round(s.labor/s.count)):'-'}</td>
+      <td>${eff}</td><td>${cps?fmt(cps):'-'}</td></tr>`;
+  });
+
+  if(sorted.length>1) {
+    const tfp=parseFloat((tot.fixed/tot.labor*100).toFixed(1));
+    const tr=tot.target>0?tot.actual/tot.target:null;
+    html+=`<tr class="total-row">
+      <td colspan="2">筛选合计（${sorted.length}家）</td>
+      <td>${tot.count}${tot.intern_count?`<span title="含${tot.intern_count}名实习生成本" class="intern-tag">(+${tot.intern_count}习)</span>`:''}</td>
+      <td>${fmt(tot.labor)}</td><td>—</td><td>${fmt(tot.fixed)}</td><td>${fmt(tot.perf)}</td>
+      <td>${fixedBadge(tfp)}</td>
+      <td>${tot.count>0?fmt(Math.round(tot.fixed/tot.count)):'-'}</td>
+      <td>${tot.count>0?fmt(Math.round(tot.perf/tot.count)):'-'}</td>
+      <td><strong>${tot.actual}</strong></td><td>${tot.target}</td>
+      <td>${tr!=null?`<span class="${rateClass(tr)}">${(tr*100).toFixed(1)}%</span>`:'—'}</td>
+      <td>${tot.count>0?fmt(Math.round(tot.labor/tot.count)):'-'}</td>
+      <td>${tot.count>0&&tot.actual>0?(tot.actual/tot.count).toFixed(2):'-'}</td>
+      <td>${tot.actual>0?fmt(Math.round(tot.labor/tot.actual)):'-'}</td></tr>`;
+  }
+  tbody.innerHTML=html;
+  renderRetailCostTable(sorted, prevStoreMap);
+}
+
+// ==============================================
+// SUPPLEMENTAL COST TABLE (法定加班 / 出差津贴 / 社保)
+// ==============================================
+const COST_COLS = [
+  { label:'门店',           field:'name',          type:'str' },
+  { label:'所属',           field:'dept',          type:'str' },
+  { label:'人数',           field:'count',         type:'num' },
+  { label:'法定加班',       field:'overtime_legal',type:'num' },
+  { label:'环比',           field:null,            type:null  },
+  { label:'出差津贴',       field:'travel',        type:'num' },
+  { label:'环比',           field:null,            type:null  },
+  { label:'社保公积金(企)', field:'social',        type:'num' },
+  { label:'环比',           field:null,            type:null  },
+];
+
+function sortCost(field) {
+  if (sortCostState.field === field) { sortCostState.dir *= -1; }
+  else { sortCostState.field = field; sortCostState.dir = -1; }
+  renderRetailTable();
+}
+
+function getSortedCostStores(arr) {
+  if (!sortCostState.field) return arr;
+  const f = sortCostState.field;
+  return [...arr].sort((a, b) => {
+    const va = f==='name'||f==='dept' ? (a[f]||'') : (a[f]||0);
+    const vb = f==='name'||f==='dept' ? (b[f]||'') : (b[f]||0);
+    if (typeof va === 'string') return sortCostState.dir * va.localeCompare(vb, 'zh');
+    return sortCostState.dir * (va - vb);
+  });
+}
+
+function renderRetailCostTable(filtered, prevStoreMap) {
+  const sorted = getSortedCostStores(filtered);
+  const si = f => {
+    if (!f) return '';
+    if (sortCostState.field !== f) return '<span class="sort-icon">⇅</span>';
+    return `<span class="sort-icon">${sortCostState.dir===1?'↑':'↓'}</span>`;
+  };
+  document.getElementById('costThead').innerHTML = '<tr>' +
+    COST_COLS.map(c => c.field
+      ? `<th class="th-sort${sortCostState.field===c.field?' active':''}" onclick="sortCost('${c.field}')">${c.label}${si(c.field)}</th>`
+      : `<th>${c.label}</th>`
+    ).join('') + '</tr>';
+
+  if (!sorted.length) {
+    document.getElementById('costTbody').innerHTML = `<tr><td colspan="9" class="no-data">暂无数据</td></tr>`;
+    return;
+  }
+  const dash = '<span style="color:var(--gray);font-size:10px">—</span>';
+  const _costDeptOrder = [...new Set(sorted.map(s=>s.dept))];
+  let html = '', tot = { ot:0, trv:0, soc:0, count:0 };
+  sorted.forEach(s => {
+    const pStore = prevStoreMap[s.name];
+    const bg = _costDeptOrder.indexOf(s.dept)%2===0 ? '#f0f7f7' : '#f6f9f6';
+    const otMom  = pStore ? momBadge(s.overtime_legal||0, pStore.overtime_legal||0) : dash;
+    const trvMom = pStore ? momBadge(s.travel||0, pStore.travel||0) : dash;
+    const socMom = pStore ? momBadge(s.social||0, pStore.social||0) : dash;
+    tot.ot  += s.overtime_legal||0;
+    tot.trv += s.travel||0;
+    tot.soc += s.social||0;
+    tot.count += s.count;
+    html += `<tr style="background:${bg}">
+      <td title="${s.name}">${s.name.replace('零售中心','').replace('（外展店）','<small style="color:var(--gray)">外展</small>')}</td>
+      <td style="color:var(--gray)">${s.dept}</td>
+      <td>${s.intern_count ? `<strong>${s.count}</strong><span title="含${s.intern_count}名实习生成本，不计入人数及人效" class="intern-tag">(+${s.intern_count}习)</span>` : `<strong>${s.count}</strong>`}</td>
+      <td>${fmt(s.overtime_legal||0)}</td><td>${otMom}</td>
+      <td>${s.travel ? fmt(s.travel) : '-'}</td><td>${trvMom}</td>
+      <td>${fmt(s.social||0)}</td><td>${socMom}</td>
+    </tr>`;
+  });
+  if (sorted.length > 1) {
+    html += `<tr class="total-row">
+      <td colspan="2">筛选合计（${sorted.length}家）</td><td>${tot.count}</td>
+      <td>${fmt(tot.ot)}</td><td>—</td>
+      <td>${fmt(tot.trv)}</td><td>—</td>
+      <td>${fmt(tot.soc)}</td><td>—</td>
+    </tr>`;
+  }
+  document.getElementById('costTbody').innerHTML = html;
+}
+
+// ==============================================
+// EXPORT COST TABLE
+// ==============================================
+function exportCostTable() {
+  const filtered = getFilteredStores();
+  const sorted = getSortedCostStores(filtered);
+  const prev = getPrevData();
+  const prevStoreMap = {};
+  if (prev && prev.retailStores) prev.retailStores.forEach(s => { prevStoreMap[s.name] = s; });
+
+  const headers = ['门店','所属部门','在编人数',
+    '法定加班','上月法定加班','法定加班环比(%)',
+    '出差津贴','上月出差津贴','出差津贴环比(%)',
+    '社保公积金(企)','上月社保','社保环比(%)'];
+
+  const momPct = (cur, prev) => prev ? parseFloat(((cur-prev)/prev*100).toFixed(1)) : null;
+
+  const dataRows = sorted.map(s => {
+    const pStore = prevStoreMap[s.name];
+    const pOt  = pStore ? pStore.overtime_legal||0 : null;
+    const pTrv = pStore ? pStore.travel||0 : null;
+    const pSoc = pStore ? pStore.social||0 : null;
+    return [s.name, s.dept, s.count,
+      s.overtime_legal||0, pOt, pOt!=null ? momPct(s.overtime_legal||0, pOt) : null,
+      s.travel||0,         pTrv, pTrv!=null ? momPct(s.travel||0, pTrv) : null,
+      s.social||0,         pSoc, pSoc!=null ? momPct(s.social||0, pSoc) : null];
+  });
+
+  const tot = sorted.reduce((a,s) => {
+    a.ot+=s.overtime_legal||0; a.trv+=s.travel||0; a.soc+=s.social||0; a.count+=s.count; return a;
+  }, {ot:0,trv:0,soc:0,count:0});
+  dataRows.push([`合计（${sorted.length}家）`,'',tot.count,
+    tot.ot,'','', tot.trv,'','', tot.soc,'','']);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+  ws['!cols'] = [22,12,6,12,12,10,10,10,10,14,12,10].map(w=>({wch:w}));
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    const cell = ws[XLSX.utils.encode_cell({r:0, c:C})];
+    if (cell) cell.s = { font:{ bold:true }, fill:{ fgColor:{ rgb:'002D28' } } };
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '补充成本明细');
+  XLSX.writeFile(wb, `补充成本明细_${state.period}.xlsx`);
+  showToast(`已导出 ${sorted.length} 家门店补充成本数据`);
+}
+
+// ==============================================
+// EXPORT RETAIL TABLE
+// ==============================================
+function exportRetailTable() {
+  const sorted = getSortedStores(getFilteredStores());
+  const prev = getPrevData();
+  const prevStoreMap = {};
+  if (prev && prev.retailStores) prev.retailStores.forEach(s => { prevStoreMap[s.name] = s; });
+
+  const headers = ['门店','所属部门','在编人数','实习生人数(成本已含)','人工成本','上月成本','环比(%)',
+    '固定成本','绩效成本','固浮比(%)','人均固定成本','人均变动成本',
+    '定单实际','定单目标','达成率(%)','人均总成本','人效(单/人)','人力CPS'];
+
+  const dataRows = sorted.map(s => {
+    const fp = s.labor>0 ? parseFloat((s.fixed/s.labor*100).toFixed(1)) : null;
+    const r = s.orders_actual!=null&&s.orders_target>0 ? parseFloat((s.orders_actual/s.orders_target*100).toFixed(1)) : null;
+    const eff = s.count>0&&s.orders_actual!=null ? parseFloat((s.orders_actual/s.count).toFixed(2)) : null;
+    const cps = s.orders_actual>0 ? Math.round(s.labor/s.orders_actual) : null;
+    const avg = s.count>0 ? Math.round(s.labor/s.count) : null;
+    const avgFixed = s.count>0 ? Math.round(s.fixed/s.count) : null;
+    const avgPerf  = s.count>0 ? Math.round(s.perf/s.count) : null;
+    const pStore = prevStoreMap[s.name];
+    const pLabor = pStore ? pStore.labor : null;
+    const momPct = pLabor ? parseFloat(((s.labor-pLabor)/pLabor*100).toFixed(1)) : null;
+    return [s.name, s.dept, s.count, s.intern_count||0, s.labor, pLabor, momPct,
+      s.fixed, s.perf, fp, avgFixed, avgPerf,
+      s.orders_actual, s.orders_target, r, avg, eff, cps];
+  });
+
+  // Totals row
+  const tot = sorted.reduce((a,s) => {
+    a.labor+=s.labor; a.fixed+=s.fixed; a.perf+=s.perf; a.count+=s.count;
+    a.intern_count+=(s.intern_count||0);
+    if(s.orders_actual!=null){a.actual+=s.orders_actual; a.target+=s.orders_target;}
+    return a;
+  }, {labor:0,fixed:0,perf:0,count:0,intern_count:0,actual:0,target:0});
+  const totFp = tot.labor>0 ? parseFloat((tot.fixed/tot.labor*100).toFixed(1)) : null;
+  const totR = tot.target>0 ? parseFloat((tot.actual/tot.target*100).toFixed(1)) : null;
+  dataRows.push([`合计（${sorted.length}家）`,'', tot.count, tot.intern_count, tot.labor,'','',
+    tot.fixed, tot.perf, totFp,
+    tot.count>0?Math.round(tot.fixed/tot.count):null,
+    tot.count>0?Math.round(tot.perf/tot.count):null,
+    tot.actual, tot.target, totR,
+    tot.count>0?Math.round(tot.labor/tot.count):null,
+    (tot.count>0&&tot.actual>0)?parseFloat((tot.actual/tot.count).toFixed(2)):null,
+    tot.actual>0?Math.round(tot.labor/tot.actual):null]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+  ws['!cols'] = [22,12,6,14,12,12,8,12,12,8,12,12,8,8,8,12,10,10].map(w=>({wch:w}));
+
+  // Style header row (set bold via cell format - basic approach)
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    const cell = ws[XLSX.utils.encode_cell({r:0, c:C})];
+    if (cell) cell.s = { font:{ bold:true }, fill:{ fgColor:{ rgb:'002D28' } } };
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '零售门店数据');
+  XLSX.writeFile(wb, `零售门店数据_${state.period}.xlsx`);
+  showToast(`已导出 ${sorted.length} 家门店数据`);
+}
+
+// ==============================================
+// RETAIL CHARTS
+// ==============================================
+function median(arr) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a,b)=>a-b);
+  const m = Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+
+function renderRetailCharts() {
+  const filtered = getFilteredStores();
+  const withOrders = filtered.filter(s=>s.orders_actual!=null);
+  const sorted2 = [...withOrders].sort((a,b)=>a.orders_actual/a.orders_target-b.orders_actual/b.orders_target);
+
+  destroyChart('chartOrderRate');
+  if(sorted2.length>0) {
+    charts.chartOrderRate = new Chart(document.getElementById('chartOrderRate'), {
+      type:'bar', data:{
+        labels:sorted2.map(s=>s.name.replace('零售中心','').replace('（外展店）','[外展]').substring(0,10)),
+        datasets:[
+          {label:'实际定单',data:sorted2.map(s=>s.orders_actual),backgroundColor:sorted2.map(s=>s.orders_actual>=s.orders_target?'#16a34a':'#00726D'),borderRadius:3,yAxisID:'y'},
+          {label:'目标定单',data:sorted2.map(s=>s.orders_target),type:'line',borderColor:'#CEA472',borderWidth:2,pointRadius:3,fill:false,yAxisID:'y'},
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45}},y:{beginAtZero:true}}}
+    });
+  } else {
+    document.getElementById('chartOrderRate').getContext('2d').clearRect(0,0,999,999);
+  }
+
+  // Cost distribution bar chart (replaces old slot)
+  destroyChart('chartCostDist');
+  if (filtered.length>0) {
+    const sortedCost = [...filtered].sort((a,b)=>b.labor/b.count-a.labor/a.count);
+    charts.chartCostDist = new Chart(document.getElementById('chartCostDist'), {
+      type:'bar',
+      data:{
+        labels: sortedCost.map(s=>s.name.replace('零售中心','').replace('（外展店）','[外展]').substring(0,10)),
+        datasets:[{
+          label:'人均总成本',
+          data: sortedCost.map(s=>s.count>0?Math.round(s.labor/s.count):0),
+          backgroundColor: sortedCost.map(s=>{
+            const avg = filtered.reduce((a,x)=>a+x.labor/x.count,0)/filtered.length;
+            return s.labor/s.count > avg ? 'rgba(220,38,38,0.6)' : 'rgba(0,114,109,0.55)';
+          }),
+          borderRadius:3
+        }]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`人均 ${(ctx.raw/10000).toFixed(2)}万元`}}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45}},
+          y:{ticks:{callback:v=>v/10000+'万'}}}}
+    });
+  }
+
+  // ---- QUADRANT CHART ----
+  const effRaw = filtered.filter(s=>s.count>0&&s.orders_actual!=null).map(s=>({
+    name: s.name.replace('零售中心','').replace('（外展店）','(外展)').substring(0,10),
+    fullName: s.name,
+    x: Math.round(s.labor/s.count),
+    y: parseFloat((s.orders_actual/s.count).toFixed(2)),
+    r: s.count
+  }));
+
+  destroyChart('chartEffCost');
+  const summaryEl = document.getElementById('quadrantSummary');
+
+  if (!effRaw.length) { if(summaryEl) summaryEl.innerHTML=''; return; }
+
+  const medX = median(effRaw.map(d=>d.x));
+  const medY = median(effRaw.map(d=>d.y));
+
+  // Assign quadrant: 1=低成本高人效, 2=高成本高人效, 3=低成本低人效, 4=高成本低人效
+  effRaw.forEach(d => {
+    const hiCost = d.x > medX, hiEff = d.y > medY;
+    d.q = hiCost ? (hiEff ? 2 : 4) : (hiEff ? 1 : 3);
+  });
+
+  const Q = {
+    1:{label:'低成本·高人效', bg:'rgba(0,114,109,0.55)',  border:'#00726D', areaBg:'rgba(0,114,109,0.06)',  areaBorder:'rgba(0,114,109,0.25)'},
+    2:{label:'高成本·高人效', bg:'rgba(206,164,114,0.75)', border:'#b07030', areaBg:'rgba(206,164,114,0.08)', areaBorder:'rgba(206,164,114,0.35)'},
+    3:{label:'低成本·低人效', bg:'rgba(82,120,160,0.55)',  border:'#5278A0', areaBg:'rgba(82,120,160,0.06)',  areaBorder:'rgba(82,120,160,0.25)'},
+    4:{label:'高成本·低人效', bg:'rgba(220,38,38,0.6)',    border:'#dc2626', areaBg:'rgba(220,38,38,0.07)',   areaBorder:'rgba(220,38,38,0.25)'},
+  };
+
+  const quadPlugin = {
+    id:'quadBg',
+    afterDraw(chart) {
+      const {ctx, chartArea:{left,right,top,bottom}, scales:{x,y}} = chart;
+      const mx = x.getPixelForValue(medX);
+      const my = y.getPixelForValue(medY);
+      ctx.save();
+      // Quadrant fills: [x0,y0,w,h,q]
+      [[left,top,mx-left,my-top,1],[mx,top,right-mx,my-top,2],
+       [left,my,mx-left,bottom-my,3],[mx,my,right-mx,bottom-my,4]].forEach(([x0,y0,w,h,q])=>{
+        ctx.fillStyle = Q[q].areaBg; ctx.fillRect(x0,y0,w,h);
+      });
+      // Dividers
+      ctx.strokeStyle='#bbb'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+      ctx.beginPath(); ctx.moveTo(mx,top); ctx.lineTo(mx,bottom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(left,my); ctx.lineTo(right,my); ctx.stroke();
+      ctx.setLineDash([]);
+      // Median labels on axes
+      ctx.font='10px sans-serif'; ctx.fillStyle='#999'; ctx.textAlign='center';
+      ctx.fillText(`中位 ${(medX/10000).toFixed(1)}万`, mx, bottom+22);
+      ctx.textAlign='right';
+      ctx.fillText(`中位 ${medY}`, left-4, my+4);
+      // Quadrant corner labels
+      const corners = [
+        {t:Q[1].label, x:left+5, y:top+13, c:'rgba(0,114,109,0.75)', a:'left'},
+        {t:Q[2].label, x:right-5, y:top+13, c:'rgba(160,100,30,0.75)', a:'right'},
+        {t:Q[3].label, x:left+5, y:bottom-6, c:'rgba(60,100,150,0.65)', a:'left'},
+        {t:Q[4].label, x:right-5, y:bottom-6, c:'rgba(180,30,30,0.75)', a:'right'},
+      ];
+      ctx.font='bold 10px "PingFang SC",sans-serif';
+      corners.forEach(c=>{ ctx.fillStyle=c.c; ctx.textAlign=c.a; ctx.fillText(c.t,c.x,c.y); });
+      ctx.restore();
+    }
+  };
+
+  charts.chartEffCost = new Chart(document.getElementById('chartEffCost'), {
+    type:'bubble',
+    data:{ datasets: [1,2,3,4].map(q=>({
+      label: Q[q].label,
+      data: effRaw.filter(d=>d.q===q).map(d=>({...d, r: Math.max(d.r*1.8, 5)})),
+      backgroundColor: Q[q].bg,
+      borderColor: Q[q].border,
+      borderWidth:1.5
+    }))},
+    plugins:[quadPlugin],
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:true, position:'top', labels:{boxWidth:10, font:{size:11}, padding:12}},
+        tooltip:{callbacks:{label:ctx=>{
+          const d=ctx.raw;
+          return `${d.fullName||d.name} | 人均 ${(d.x/10000).toFixed(2)}万 | 人效 ${d.y}单/人`;
+        }}}
+      },
+      scales:{
+        x:{title:{display:true,text:'人均总成本（元）',font:{size:10}}, ticks:{callback:v=>(v/10000).toFixed(1)+'万'}},
+        y:{title:{display:true,text:'人效（单/人）',font:{size:10}}}
+      }
+    }
+  });
+
+  renderQuadrantSummary(effRaw, medX, medY);
+}
+
+function renderQuadrantSummary(data, medX, medY) {
+  const el = document.getElementById('quadrantSummary');
+  if (!el) return;
+  const defs = [
+    {q:1, icon:'⭐', title:'低成本·高人效', desc:'成本控制好且人效突出，是当前的标杆门店，可作为经验推广参考。', color:'#00726D', bg:'rgba(0,114,109,0.06)', border:'rgba(0,114,109,0.2)'},
+    {q:2, icon:'📈', title:'高成本·高人效', desc:'人效表现出色但成本偏高，建议深挖成本结构，优化固浮比或人员配置。', color:'#9a6c20', bg:'rgba(206,164,114,0.1)', border:'rgba(180,130,50,0.35)'},
+    {q:3, icon:'⚡', title:'低成本·低人效', desc:'成本可控，但单量产出不足，建议聚焦订单获取能力及员工激励机制。', color:'#3a6898', bg:'rgba(82,120,160,0.07)', border:'rgba(82,120,160,0.25)'},
+    {q:4, icon:'⚠️', title:'高成本·低人效', desc:'高投入低产出，需重点排查人员结构及运营效率，优先制定改善方案。', color:'#dc2626', bg:'rgba(220,38,38,0.06)', border:'rgba(220,38,38,0.2)'},
+  ];
+  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">` +
+    defs.map(d=>{
+      const stores = data.filter(s=>s.q===d.q);
+      const tags = stores.length
+        ? stores.map(s=>`<span style="background:${d.bg};border:1px solid ${d.border};padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;color:${d.color}">${s.name}</span>`).join(' ')
+        : '<span style="color:#aaa;font-size:11px">暂无门店</span>';
+      return `<div style="background:${d.bg};border:1px solid ${d.border};border-radius:8px;padding:12px 14px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+          <span style="font-size:15px">${d.icon}</span>
+          <span style="font-weight:700;font-size:13px;color:${d.color}">${d.title}</span>
+          <span style="margin-left:auto;background:${d.color};color:#fff;border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700">${stores.length}家</span>
+        </div>
+        <div style="font-size:11px;color:#555;margin-bottom:8px;line-height:1.5">${d.desc}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${tags}</div>
+      </div>`;
+    }).join('') + `</div>`;
+}
+
+
+// ==============================================
+// SUPPORT TABLE
+// ==============================================
+function renderSupportTable() {
+  const html = state.supportDepts.map(s=>{
+    const fp=parseFloat((s.fixed/s.labor*100).toFixed(1));
+    return `<tr><td>${s.name}</td><td>${s.count}</td>
+      <td>${fmt(s.labor)}</td><td style="color:var(--fixed-color)">${fmt(s.fixed)}</td>
+      <td style="color:var(--perf-color)">${fmt(s.perf)}</td>
+      <td>${fixedBadge(fp)}</td><td>${fmt(Math.round(s.labor/s.count))}</td></tr>`;
+  }).join('');
+  document.getElementById('supportTbody').innerHTML = html;
+}
+
+// ==============================================
+// DELIVERY
+// ==============================================
+function renderDelivery() {
+  const ds=state.deliveryStores, dss=state.deliverySupport;
+  const tL=sum(ds,'labor'), tF=sum(ds,'fixed'), tP=sum(ds,'perf'), tC=sum(ds,'count');
+  document.getElementById('deliverySummaryRow').innerHTML=`
+    <div class="s-card"><div class="s-label">交付总人工成本</div><div class="s-val" style="color:var(--primary)">${fmtW(tL)}<small style="font-size:11px">万</small></div></div>
+    <div class="s-card"><div class="s-label">交付总固定成本</div><div class="s-val" style="color:var(--fixed-color)">${fmtW(tF)}<small style="font-size:11px">万</small></div></div>
+    <div class="s-card"><div class="s-label">交付总绩效成本</div><div class="s-val" style="color:var(--perf-color)">${fmtW(tP)}<small style="font-size:11px">万</small></div></div>
+    <div class="s-card"><div class="s-label">交付在编人数</div><div class="s-val" style="color:var(--primary)">${tC}<small style="font-size:11px">人</small></div></div>`;
+
+  document.getElementById('deliveryCards').innerHTML = ds.map(s=>{
+    const fp=parseFloat((s.fixed/s.labor*100).toFixed(1));
+    const col=fp>70?'var(--orange)':'var(--green)';
+    return `<div class="store-card">
+      <h4>🏭 ${s.name}</h4>
+      ${[['在编人数',s.count+'人'],['人工成本',fmt(s.labor)+' 元'],['固定成本',fmt(s.fixed)+' 元'],
+        ['绩效成本',fmt(s.perf)+' 元'],['法定加班费',fmt(s.overtime_legal)+' 元'],
+        ['出差津贴',(s.travel?fmt(s.travel):0)+' 元'],['社保公积金（企业）',fmt(s.social)+' 元'],
+        ['人均总成本',fmt(Math.round(s.labor/s.count))+' 元/人'],
+        ['人均固定成本',fmt(Math.round(s.fixed/s.count))+' 元/人'],
+        ['人均绩效成本',fmt(Math.round(s.perf/s.count))+' 元/人']
+      ].map(([l,v])=>`<div class="metric-row"><span class="label">${l}</span><span class="val">${v}</span></div>`).join('')}
+      <div class="metric-row"><span class="label">固浮比</span>
+        <span><div style="display:flex;align-items:center;gap:6px">
+          <div class="ratio-bar"><div class="ratio-fixed" style="width:${fp}%"></div><div class="ratio-perf" style="width:${100-fp}%"></div></div>
+          <span style="font-weight:700;color:${col}">${fp}%</span></div></span></div>
+    </div>`;
+  }).join('');
+
+  // Delivery insight
+  if(ds.length>=2) {
+    const [d1,d2]=ds;
+    const fp1=(d1.fixed/d1.labor*100).toFixed(1), fp2=(d2.fixed/d2.labor*100).toFixed(1);
+    const avg1=Math.round(d1.labor/d1.count), avg2=Math.round(d2.labor/d2.count);
+    document.getElementById('deliveryInsight').innerHTML=
+      `<strong style="color:var(--primary-dark)">洞察：</strong>
+      ${d2.name.replace('交付中心','')}人均成本（${fmt(avg2)}元）${avg2>avg1?'高':'低'}于${d1.name.replace('交付中心','')}（${fmt(avg1)}元），
+      ${d2.name.replace('交付中心','')}绩效占比（${(100-fp2)}%）${100-fp2>100-fp1?'更高':'更低'}，激励导向${100-fp2>100-fp1?'更强':'相对偏弱'}；
+      人数较多的${(d1.count>d2.count?d1:d2).name.replace('交付中心','')}固定成本基数较大，人力ROI有优化空间。`;
+  }
+
+  destroyChart('chartDelivery');
+  if(ds.length>=2) {
+    charts.chartDelivery = new Chart(document.getElementById('chartDelivery'), {
+      type:'bar', data:{
+        labels:['固定成本(万)','绩效成本(万)','人均总成本(千)','固定比例(%)'],
+        datasets: ds.map((s,i)=>({
+          label:s.name, borderRadius:3,
+          backgroundColor:['#00726D','#002D28'][i],
+          data:[+(s.fixed/10000).toFixed(1),+(s.perf/10000).toFixed(1),
+            +(s.labor/s.count/1000).toFixed(1),+(s.fixed/s.labor*100).toFixed(1)]
+        }))
+      },
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},
+        scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}
+    });
+  }
+
+  // Delivery support
+  document.getElementById('deliverySupportTbody').innerHTML = dss.map(s=>{
+    const fp=parseFloat((s.fixed/s.labor*100).toFixed(1));
+    return `<tr><td>${s.name}</td><td>${s.count}</td><td>${fmt(s.labor)}</td>
+      <td style="color:var(--fixed-color)">${fmt(s.fixed)}</td><td style="color:var(--perf-color)">${fmt(s.perf)}</td>
+      <td>${fixedBadge(fp)}</td><td>${fmt(Math.round(s.labor/s.count))}</td></tr>`;
+  }).join('');
+}
+
+// ==============================================
+// PERSONNEL FILTERS (multi-select store dropdown)
+// ==============================================
+let _pMsAllStores = [];
+
+function pGetMsSelected() {
+  return [...document.querySelectorAll('#pMsList input[type=checkbox]:checked')].map(cb => cb.value);
+}
+function pMsSetSelected(names) {
+  document.querySelectorAll('#pMsList input[type=checkbox]').forEach(cb => { cb.checked = names.includes(cb.value); });
+  pMsSyncLabel();
+  pMsSyncSelectAll();
+}
+function pMsSyncLabel() {
+  const sel = pGetMsSelected();
+  const lbl = document.getElementById('pMsLabel');
+  if (!sel.length) { lbl.textContent = '全部门店'; }
+  else if (sel.length === 1) { lbl.textContent = sel[0]; }
+  else { lbl.innerHTML = `已选 <span class="ms-count-badge">${sel.length}</span> 家门店`; }
+}
+function pMsSyncSelectAll() {
+  const all = document.querySelectorAll('#pMsList input[type=checkbox]');
+  const checked = document.querySelectorAll('#pMsList input[type=checkbox]:checked');
+  const sa = document.getElementById('pMsSelectAll');
+  sa.indeterminate = checked.length > 0 && checked.length < all.length;
+  sa.checked = all.length > 0 && checked.length === all.length;
+}
+function pToggleMsPanel() {
+  const panel = document.getElementById('pMsPanel');
+  const trigger = document.getElementById('pMsTrigger');
+  const isOpen = panel.classList.toggle('open');
+  trigger.classList.toggle('open', isOpen);
+  if (isOpen) { document.getElementById('pMsSearch').value=''; pFilterMsOptions(''); document.getElementById('pMsSearch').focus(); }
+}
+function pCloseMsPanel() {
+  document.getElementById('pMsPanel').classList.remove('open');
+  document.getElementById('pMsTrigger').classList.remove('open');
+}
+// ── Multi-select title dropdown (人员明细 岗位) ──
+function pGetTitleMsSelected() {
+  return [...document.querySelectorAll('#pTitleMsList input[type=checkbox]:checked')].map(cb => cb.value);
+}
+function pTitleMsSyncLabel() {
+  const sel = pGetTitleMsSelected();
+  const lbl = document.getElementById('pTitleMsLabel');
+  if (!sel.length) { lbl.textContent = '全部岗位'; }
+  else if (sel.length === 1) { lbl.textContent = sel[0]; }
+  else { lbl.innerHTML = `已选 <span class="ms-count-badge">${sel.length}</span> 个岗位`; }
+}
+function pTitleMsSyncSelectAll() {
+  const all = document.querySelectorAll('#pTitleMsList input[type=checkbox]');
+  const checked = document.querySelectorAll('#pTitleMsList input[type=checkbox]:checked');
+  const sa = document.getElementById('pTitleMsSelectAll');
+  sa.indeterminate = checked.length > 0 && checked.length < all.length;
+  sa.checked = all.length > 0 && checked.length === all.length;
+}
+function pToggleTitleMsPanel() {
+  const panel = document.getElementById('pTitleMsPanel');
+  const trigger = document.getElementById('pTitleMsTrigger');
+  const isOpen = panel.classList.toggle('open');
+  trigger.classList.toggle('open', isOpen);
+  if (isOpen) { document.getElementById('pTitleMsSearch').value=''; pFilterTitleMsOptions(''); document.getElementById('pTitleMsSearch').focus(); }
+}
+function pCloseTitleMsPanel() {
+  document.getElementById('pTitleMsPanel').classList.remove('open');
+  document.getElementById('pTitleMsTrigger').classList.remove('open');
+}
+function pFilterTitleMsOptions(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#pTitleMsList .ms-item').forEach(item => {
+    item.style.display = !q || item.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+function pTitleMsToggleAll(cb) {
+  document.querySelectorAll('#pTitleMsList input[type=checkbox]').forEach(c => { c.checked = cb.checked; });
+  pTitleMsSyncLabel();
+  renderPersonnel();
+}
+function populatePersonnelTitleDropdown() {
+  const dept = document.getElementById('pFilterDept').value;
+  const stores = pGetMsSelected();
+  const employees = state.employees || [];
+  const ALLOWED_TITLES = ['产品专家','产品专员','储备管理','高级产品专家','资深产品专家','零售主管'];
+  const allTitles = employees
+    .filter(e => {
+      if (e.isIntern === true) return false;
+      if (!e.name) return false;
+      if (dept && e.dept !== dept) return false;
+      if (stores.length && !stores.includes(e.store)) return false;
+      return e.title && ALLOWED_TITLES.includes(e.title);
+    })
+    .map(e => e.title)
+    .filter((v,i,a) => v && a.indexOf(v) === i)
+    .sort((a,b) => a.localeCompare(b, 'zh'));
+  const prevSelected = pGetTitleMsSelected().filter(n => allTitles.includes(n));
+  const list = document.getElementById('pTitleMsList');
+  list.innerHTML = allTitles.map(n =>
+    `<label class="ms-item" data-name="${n}">
+      <input type="checkbox" value="${n}" onchange="pTitleMsSyncLabel();pTitleMsSyncSelectAll();renderPersonnel()"${prevSelected.includes(n)?' checked':''}> ${n}
+    </label>`
+  ).join('');
+  pTitleMsSyncLabel();
+  pTitleMsSyncSelectAll();
+}
+function pFilterMsOptions(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#pMsList .ms-item').forEach(item => {
+    item.style.display = !q || item.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+function pMsToggleAll(cb) {
+  document.querySelectorAll('#pMsList input[type=checkbox]').forEach(c => { c.checked = cb.checked; });
+  pMsSyncLabel();
+  populatePersonnelTitleDropdown();
+  renderPersonnel();
+}
+function populatePersonnelStoreDropdown() {
+  const dept = document.getElementById('pFilterDept').value;
+  const employees = state.employees || [];
+  _pMsAllStores = employees
+    .filter(e => {
+      if (e.isIntern === true) return false;
+      if (!e.name) return false;
+      if (dept && e.dept !== dept) return false;
+      return true;
+    })
+    .map(e => e.store)
+    .filter((v,i,a) => v && a.indexOf(v) === i)
+    .sort((a,b) => a.localeCompare(b, 'zh'));
+  const prevSelected = pGetMsSelected().filter(n => _pMsAllStores.includes(n));
+  const list = document.getElementById('pMsList');
+  list.innerHTML = _pMsAllStores.map(n =>
+    `<label class="ms-item" data-name="${n}">
+      <input type="checkbox" value="${n}" onchange="pMsSyncLabel();pMsSyncSelectAll();populatePersonnelTitleDropdown();renderPersonnel()"${prevSelected.includes(n)?' checked':''}> ${n}
+    </label>`
+  ).join('');
+  pMsSyncLabel();
+  pMsSyncSelectAll();
+}
+function clearPersonnelFilters() {
+  document.getElementById('pFilterDept').value = '';
+  _pMsAllStores = [];
+  document.getElementById('pMsList').innerHTML = '';
+  pMsSetSelected([]);
+  document.getElementById('pTitleMsList').innerHTML = '';
+  document.querySelectorAll('#pTitleMsList input[type=checkbox]').forEach(c => { c.checked = false; });
+  pTitleMsSyncLabel();
+  pTitleMsSyncSelectAll();
+  populatePersonnelStoreDropdown();
+  populatePersonnelTitleDropdown();
+  renderPersonnel();
+}
+// ==============================================
+// Personnel sort state
+let _personnelSort = { col: '', dir: 1 }; // dir: 1=asc, -1=desc
+function personnelSortBy(col) {
+  if (_personnelSort.col === col) _personnelSort.dir *= -1;
+  else { _personnelSort.col = col; _personnelSort.dir = 1; }
+  // Update sort indicators
+  document.querySelectorAll('.sort-indicator').forEach(el => {
+    el.classList.remove('active');
+    el.textContent = '';
+  });
+  const ind = document.getElementById('pSort-' + col);
+  if (ind) {
+    ind.classList.add('active');
+    ind.textContent = _personnelSort.dir === 1 ? '▲' : '▼';
+  }
+  renderPersonnel();
+}
+// ==============================================
+function renderPersonnel() {
+  const employees = state.employees || [];
+  const personTbody = document.getElementById('personnelTbody');
+
+  if (!employees.length) {
+    personTbody.innerHTML = '<tr><td colspan="8" class="no-data">暂无员工数据，请先导入成本数据</td></tr>';
+    document.getElementById('personnelQuadrantSummary').innerHTML = '';
+    destroyChart('chartPersonnel');
+    return;
+  }
+
+  // Populate department filter (only on first render)
+  const deptFilter = document.getElementById('pFilterDept');
+  const currentDeptVal = deptFilter.value;
+  const depts = [...new Set(employees.filter(e=>e.dept).map(e=>e.dept))].sort((a,b)=>a.localeCompare(b,'zh'));
+  // Only rebuild options if list changed (preserve selection)
+  const existingOpts = [...deptFilter.options].map(o=>o.value).filter(v=>v);
+  if (JSON.stringify(existingOpts) !== JSON.stringify(depts)) {
+    deptFilter.innerHTML = '<option value="">全部</option>' + depts.map(d => `<option value="${d}">${d}</option>`).join('');
+    deptFilter.value = currentDeptVal || '';
+  }
+
+  // Populate multi-select store dropdown
+  populatePersonnelStoreDropdown();
+  // Populate multi-select title dropdown
+  populatePersonnelTitleDropdown();
+
+  // Get filter values
+  const selectedDept = deptFilter.value;
+  const selectedStores = pGetMsSelected();
+  const selectedTitles = pGetTitleMsSelected();
+
+  // Filter: exclude interns, must have name, filter by dept/store (and role-based)
+  const ALLOWED_TITLES = ['产品专家','产品专员','储备管理','高级产品专家','资深产品专家','零售主管'];
+  const hasTitleData = employees.some(e => e.title);  // old data may not have title field
+
+  let filtered = employees.filter(e => {
+    if (e.isIntern === true) return false;
+    if (!e.name) return false;
+    if (selectedDept && e.dept !== selectedDept) return false;
+    if (selectedStores.length && !selectedStores.includes(e.store)) return false;
+    // Apply title filter: if user selected titles, filter by selection; else use default allowed list
+    if (selectedTitles.length) {
+      if (!selectedTitles.includes(e.title)) return false;
+    } else {
+      if (hasTitleData && (!e.title || !ALLOWED_TITLES.includes(e.title))) return false;
+    }
+    return true;
+  });
+
+  // Role-based store filtering (client-side, for personnel tab)
+  const userRole = currentUser ? currentUser.role : 'admin';
+  if (userRole === 'retail') {
+    filtered = filtered.filter(e => e.cat === '零售');
+  } else if (userRole === 'delivery') {
+    filtered = filtered.filter(e => e.cat === '交付');
+  }
+
+  // Calculate data points
+  const points = filtered.map(e => ({
+    id: e.id,
+    name: e.name,
+    title: e.title || '',
+    store: e.store,
+    dept: e.dept,
+    cat: e.cat,
+    x: e.labor || 0,
+    y: typeof e.orders === 'number' ? e.orders : 0,
+    r: 8
+  }));
+
+  // Sort by store then name (default), or by user-selected sort column
+  if (_personnelSort.col) {
+    const sc = _personnelSort.col;
+    const dir = _personnelSort.dir;
+    points.sort((a,b) => {
+      let va, vb;
+      if (sc === 'labor') { va = a.x; vb = b.x; }
+      else if (sc === 'orders') { va = a.y; vb = b.y; }
+      else if (sc === 'quadrant') { va = a.q || 0; vb = b.q || 0; }
+      else { va = (a[sc]||'').toString(); vb = (b[sc]||'').toString(); }
+      if (typeof va === 'number') return (va - vb) * dir;
+      return va.localeCompare(vb, 'zh') * dir;
+    });
+  } else {
+    points.sort((a,b) => (a.store||'').localeCompare(b.store||'') || a.name.localeCompare(b.name));
+  }
+
+  if (!points.length) {
+    personTbody.innerHTML = '<tr><td colspan="8" class="no-data">暂无匹配的员工数据</td></tr>';
+    document.getElementById('personnelQuadrantSummary').innerHTML = '';
+    destroyChart('chartPersonnel');
+    return;
+  }
+
+  // Quadrant chart
+  const validPoints = points.filter(p => p.x > 0);
+  destroyChart('chartPersonnel');
+
+  if (validPoints.length) {
+    const medX = median(validPoints.map(d => d.x));
+    const medY = median(validPoints.map(d => d.y));
+
+    validPoints.forEach(d => {
+      const hiCost = d.x > medX, hiOrders = d.y > medY;
+      d.q = hiCost ? (hiOrders ? 2 : 4) : (hiOrders ? 1 : 3);
+    });
+
+    const Q = {
+      1:{label:'低成本·高定单', bg:'rgba(0,114,109,0.55)',  border:'#00726D', areaBg:'rgba(0,114,109,0.06)',  areaBorder:'rgba(0,114,109,0.25)'},
+      2:{label:'高成本·高定单', bg:'rgba(206,164,114,0.75)', border:'#b07030', areaBg:'rgba(206,164,114,0.08)', areaBorder:'rgba(206,164,114,0.35)'},
+      3:{label:'低成本·低定单', bg:'rgba(82,120,160,0.55)',  border:'#5278A0', areaBg:'rgba(82,120,160,0.06)',  areaBorder:'rgba(82,120,160,0.25)'},
+      4:{label:'高成本·低定单', bg:'rgba(220,38,38,0.6)',    border:'#dc2626', areaBg:'rgba(220,38,38,0.07)',   areaBorder:'rgba(220,38,38,0.25)'},
+    };
+
+    const personQuadPlugin = {
+      id:'personQuadBg',
+      afterDraw(chart) {
+        const {ctx, chartArea:{left,right,top,bottom}, scales:{x,y}} = chart;
+        const mx = x.getPixelForValue(medX);
+        const my = y.getPixelForValue(medY);
+        ctx.save();
+        [[left,top,mx-left,my-top,1],[mx,top,right-mx,my-top,2],
+         [left,my,mx-left,bottom-my,3],[mx,my,right-mx,bottom-my,4]].forEach(([x0,y0,w,h,q])=>{
+          ctx.fillStyle = Q[q].areaBg; ctx.fillRect(x0,y0,w,h);
+        });
+        ctx.strokeStyle='#bbb'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+        ctx.beginPath(); ctx.moveTo(mx,top); ctx.lineTo(mx,bottom); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(left,my); ctx.lineTo(right,my); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font='10px sans-serif'; ctx.fillStyle='#999'; ctx.textAlign='center';
+        ctx.fillText(`中位 ${fmt(medX)}元`, mx, bottom+22);
+        ctx.textAlign='right';
+        ctx.fillText(`中位 ${medY}单`, left-4, my+4);
+        const corners = [
+          {t:Q[1].label, x:left+5, y:top+13, c:'rgba(0,114,109,0.75)', a:'left'},
+          {t:Q[2].label, x:right-5, y:top+13, c:'rgba(160,100,30,0.75)', a:'right'},
+          {t:Q[3].label, x:left+5, y:bottom-6, c:'rgba(60,100,150,0.65)', a:'left'},
+          {t:Q[4].label, x:right-5, y:bottom-6, c:'rgba(180,30,30,0.75)', a:'right'},
+        ];
+        ctx.font='bold 10px "PingFang SC",sans-serif';
+        corners.forEach(c=>{ ctx.fillStyle=c.c; ctx.textAlign=c.a; ctx.fillText(c.t,c.x,c.y); });
+        ctx.restore();
+      }
+    };
+
+    charts.chartPersonnel = new Chart(document.getElementById('chartPersonnel'), {
+      type:'bubble',
+      data:{ datasets: [1,2,3,4].map(q=>({
+        label: Q[q].label,
+        data: validPoints.filter(d=>d.q===q).map(d=>({...d, r: d.r})),
+        backgroundColor: Q[q].bg,
+        borderColor: Q[q].border,
+        borderWidth:1.5
+      }))},
+      plugins:[personQuadPlugin],
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{display:true, position:'top', labels:{boxWidth:10, font:{size:11}, padding:12}},
+          tooltip:{callbacks:{label:ctx=>{
+            const d=ctx.raw;
+            return `${d.name} | ${d.title||'—'} | ${d.store||'—'} | 成本 ${fmt(d.x)}元 | 定单 ${d.y}单`;
+          }}}
+        },
+        scales:{
+          x:{title:{display:true,text:'个人成本（元）',font:{size:10}}, ticks:{callback:v=>fmt(v)}},
+          y:{title:{display:true,text:'个人定单量（单）',font:{size:10}}, beginAtZero:true}
+        }
+      }
+    });
+
+    // Render quadrant summary
+    renderPersonnelQuadrantSummary(validPoints, medX, medY, Q);
+
+    // Render table with quadrant info
+    personTbody.innerHTML = points.map(p => {
+      const q = p.q || (p.x > 0 ? '—' : '—');
+      const qLabel = Q[q] ? Q[q].label : '—';
+      const qColor = Q[q] ? Q[q].border : '#999';
+      return `<tr>
+        <td>${p.name}</td>
+        <td>${p.title || '—'}</td>
+        <td>${p.store || '—'}</td>
+        <td>${p.dept || '—'}</td>
+        <td>${p.cat || '—'}</td>
+        <td>${fmt(p.x)}</td>
+        <td>${p.y}</td>
+        <td><span style="color:${qColor};font-weight:600">${qLabel}</span></td>
+      </tr>`;
+    }).join('');
+  } else {
+    const canvas = document.getElementById('chartPersonnel');
+    if (canvas) canvas.getContext('2d').clearRect(0,0,999,999);
+    document.getElementById('personnelQuadrantSummary').innerHTML = '';
+    personTbody.innerHTML = points.map(p => `<tr>
+      <td>${p.name}</td>
+      <td>${p.title || '—'}</td>
+      <td>${p.store || '—'}</td>
+      <td>${p.dept || '—'}</td>
+      <td>${p.cat || '—'}</td>
+      <td>${fmt(p.x)}</td>
+      <td>${p.y}</td>
+      <td style="color:#999">—</td>
+    </tr>`).join('');
+  }
+}
+
+function renderPersonnelQuadrantSummary(data, medX, medY, Q) {
+  const el = document.getElementById('personnelQuadrantSummary');
+  if (!el) return;
+  const defs = [
+    {q:1, icon:'⭐', title:'优秀员工 · 低成本高定单', desc:'成本控制好且产出突出，是当前的标杆员工，可作经验推广。', color:'#00726D', bg:'rgba(0,114,109,0.06)', border:'rgba(0,114,109,0.2)'},
+    {q:2, icon:'📈', title:'核心骨干 · 高成本高定单', desc:'产出出色但成本偏高，建议深挖成本结构，优化薪酬配置。', color:'#9a6c20', bg:'rgba(206,164,114,0.1)', border:'rgba(180,130,50,0.35)'},
+    {q:3, icon:'⚡', title:'潜力新人 · 低成本低定单', desc:'成本可控但单量不足，建议加强培训和订单获取能力。', color:'#3a6898', bg:'rgba(82,120,160,0.07)', border:'rgba(82,120,160,0.25)'},
+    {q:4, icon:'⚠️', title:'需关注 · 高成本低定单', desc:'高投入低产出，需重点排查，优先制定改善或汰换方案。', color:'#dc2626', bg:'rgba(220,38,38,0.06)', border:'rgba(220,38,38,0.2)'},
+  ];
+  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">` +
+    defs.map(d=>{
+      const persons = data.filter(s=>s.q===d.q);
+      const tags = persons.length
+        ? persons.map(s=>`<span style="background:${d.bg};border:1px solid ${d.border};padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;color:${d.color}">${s.name}(${s.y}单/${fmt(s.x)}元)</span>`).join(' ')
+        : '<span style="color:#aaa;font-size:11px">暂无员工</span>';
+      return `<div style="background:${d.bg};border:1px solid ${d.border};border-radius:8px;padding:12px 14px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+          <span style="font-size:15px">${d.icon}</span>
+          <span style="font-weight:700;font-size:13px;color:${d.color}">${d.title}</span>
+          <span style="margin-left:auto;background:${d.color};color:#fff;border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700">${persons.length}人</span>
+        </div>
+        <div style="font-size:11px;color:#555;margin-bottom:8px;line-height:1.5">${d.desc}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${tags}</div>
+      </div>`;
+    }).join('') + `</div>`;
+}
+
+// ==============================================
+// UTILS
+// ==============================================
+function destroyChart(id) {
+  if(charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    b.classList.toggle('active',['overview','retail','delivery','personnel','annual'][i]===id);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  if (id === 'annual') renderAnnualSummary();
+}
+
+// ==============================================
+// ANNUAL SUMMARY
+// ==============================================
+async function renderAnnualSummary() {
+  const el = document.getElementById('annualContent');
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray);font-size:13px">数据加载中…</div>';
+
+  if (!allMonthKeys.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray);font-size:13px">暂无数据，请先导入月份数据</div>';
+    return;
+  }
+
+  // Load all months
+  await Promise.all(allMonthKeys.map(ym => apiGetData(ym)));
+
+  // Build rows: one per month in chronological order (allMonthKeys is latest-first, reverse it)
+  const orderedKeys = [...allMonthKeys].reverse();
+
+  const rows = [];
+  let ytd = { labor:0, fixed:0, perf:0, count:0,
+    rlabor:0, rfixed:0, rperf:0, rcount:0, rorders:0,
+    dlabor:0, dfixed:0, dperf:0, dcount:0, dorders:0 };
+
+  orderedKeys.forEach(ym => {
+    const d = monthDataCache[ym];
+    if (!d) return;
+    const allEntries = [...(d.retailStores||[]), ...(d.supportDepts||[]), ...(d.deliveryStores||[]), ...(d.deliverySupport||[])];
+    const retail = [...(d.retailStores||[]), ...(d.supportDepts||[])];
+    const delivery = [...(d.deliveryStores||[]), ...(d.deliverySupport||[])];
+
+    const sum = (arr, f) => arr.reduce((s, x) => s + (x[f]||0), 0);
+
+    const labor   = sum(allEntries,'labor');
+    const fixed   = sum(allEntries,'fixed');
+    const perf    = sum(allEntries,'perf');
+    const count   = sum(allEntries,'count');
+    const rlabor  = sum(retail,'labor');
+    const rfixed  = sum(retail,'fixed');
+    const rperf   = sum(retail,'perf');
+    const rcount  = sum(retail,'count');
+    const rorders = sum(d.retailStores||[],'orders_actual');
+    const dlabor  = sum(delivery,'labor');
+    const dfixed  = sum(delivery,'fixed');
+    const dperf   = sum(delivery,'perf');
+    const dcount  = sum(delivery,'count');
+    const dorders = d.deliveryTotal != null ? d.deliveryTotal : sum(d.deliveryStores||[],'orders_actual');
+
+    rows.push({ ym, period: d.period||ym,
+      labor, fixed, perf, count,
+      rlabor, rfixed, rperf, rcount, rorders,
+      dlabor, dfixed, dperf, dcount, dorders });
+
+    ytd.labor   += labor;   ytd.fixed   += fixed;   ytd.perf   += perf;   ytd.count   = Math.max(ytd.count, count);
+    ytd.rlabor  += rlabor;  ytd.rfixed  += rfixed;  ytd.rperf  += rperf;  ytd.rcount  = Math.max(ytd.rcount, rcount);
+    ytd.rorders += rorders;
+    ytd.dlabor  += dlabor;  ytd.dfixed  += dfixed;  ytd.dperf  += dperf;  ytd.dcount  = Math.max(ytd.dcount, dcount);
+    ytd.dorders += dorders;
+  });
+
+  function W(n) { return n ? (n/10000).toFixed(1) : '—'; }
+  function N(n) { return n ? String(n) : '—'; }
+  function O(n) { return n ? String(n) : '—'; }
+  function Eff(orders, count) { return (orders && count) ? (orders/count).toFixed(2) : '—'; }
+
+  function makeRow(r, isYTD=false) {
+    const bg = isYTD ? 'background:#f0f9ff;font-weight:700;color:var(--primary-dark)' : '';
+    const label = isYTD ? '累计合计' : r.period;
+    const d = isYTD ? r : r;
+    return `<tr style="${bg}">
+      <td style="text-align:left;font-weight:${isYTD?700:600}">${label}</td>
+      <td>${W(d.labor)}</td><td>${W(d.fixed)}</td><td>${W(d.perf)}</td><td>${isYTD?'—':N(d.count)}</td>
+      <td>${W(d.rlabor)}</td><td>${W(d.rfixed)}</td><td>${W(d.rperf)}</td><td>${isYTD?'—':N(d.rcount)}</td><td>${O(d.rorders)}</td><td>${isYTD?'—':Eff(d.rorders,d.rcount)}</td>
+      <td>${W(d.dlabor)}</td><td>${W(d.dfixed)}</td><td>${W(d.dperf)}</td><td>${isYTD?'—':N(d.dcount)}</td><td>${O(d.dorders)}</td><td>${isYTD?'—':Eff(d.dorders,d.dcount)}</td>
+    </tr>`;
+  }
+
+  const bodyRows = rows.map(r => makeRow(r)).join('');
+  const ytdRow = makeRow(ytd, true);
+  _annualRows = rows;
+  _annualYtd = ytd;
+
+  el.innerHTML = `
+    <div class="card" style="margin-top:4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="section-title" style="margin:0">1–12月数据汇总</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:11px;color:var(--gray)">共 ${rows.length} 个月 &nbsp;|&nbsp; 人数取各月最大值</span>
+          <button class="export-btn" onclick="exportAnnualExcel()" style="display:inline-flex">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            导出 Excel
+          </button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2" style="text-align:left;min-width:80px">月份</th>
+              <th colspan="4" style="background:#e8f4f3;border-bottom:1px solid var(--border)">战区整体</th>
+              <th colspan="6" style="background:#fdf5eb;border-bottom:1px solid var(--border)">零售（含战区支持）</th>
+              <th colspan="6" style="background:#eff6ff;border-bottom:1px solid var(--border)">交付</th>
+            </tr>
+            <tr>
+              <th style="background:#e8f4f3">总人工成本（万）</th>
+              <th style="background:#e8f4f3">固定（万）</th>
+              <th style="background:#e8f4f3">绩效（万）</th>
+              <th style="background:#e8f4f3">人数（人）</th>
+              <th style="background:#fdf5eb">总成本（万）</th>
+              <th style="background:#fdf5eb">固定（万）</th>
+              <th style="background:#fdf5eb">绩效（万）</th>
+              <th style="background:#fdf5eb">人数（人）</th>
+              <th style="background:#fdf5eb">总定单量（单）</th>
+              <th style="background:#fdf5eb">人效（单/人）</th>
+              <th style="background:#eff6ff">总成本（万）</th>
+              <th style="background:#eff6ff">固定（万）</th>
+              <th style="background:#eff6ff">绩效（万）</th>
+              <th style="background:#eff6ff">人数（人）</th>
+              <th style="background:#eff6ff">总交付量（单）</th>
+              <th style="background:#eff6ff">人效（单/人）</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+            ${ytdRow}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ==============================================
+// ANNUAL EXPORT
+// ==============================================
+function exportAnnualExcel() {
+  if (!_annualRows.length) { showToast('暂无数据', 'error'); return; }
+  const zn = window._zoneName || '战区';
+
+  function W(n) { return n ? parseFloat((n/10000).toFixed(1)) : 0; }
+  function Eff(orders, count) { return (orders && count) ? parseFloat((orders/count).toFixed(2)) : null; }
+
+  // Header rows (2-row merged header)
+  const header1 = ['月份',
+    '战区整体-总人工成本(万)', '战区整体-固定(万)', '战区整体-绩效(万)', '战区整体-人数',
+    '零售-总成本(万)', '零售-固定(万)', '零售-绩效(万)', '零售-人数', '零售-总定单量', '零售-人效(单/人)',
+    '交付-总成本(万)', '交付-固定(万)', '交付-绩效(万)', '交付-人数', '交付-总交付量', '交付-人效(单/人)',
+  ];
+
+  const dataRows = _annualRows.map(r => [
+    r.period,
+    W(r.labor), W(r.fixed), W(r.perf), r.count||0,
+    W(r.rlabor), W(r.rfixed), W(r.rperf), r.rcount||0, r.rorders||0, Eff(r.rorders, r.rcount),
+    W(r.dlabor), W(r.dfixed), W(r.dperf), r.dcount||0, r.dorders||0, Eff(r.dorders, r.dcount),
+  ]);
+
+  const ytd = _annualYtd;
+  const ytdRow = ['累计合计',
+    W(ytd.labor), W(ytd.fixed), W(ytd.perf), null,
+    W(ytd.rlabor), W(ytd.rfixed), W(ytd.rperf), null, ytd.rorders||0, null,
+    W(ytd.dlabor), W(ytd.dfixed), W(ytd.dperf), null, ytd.dorders||0, null,
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([header1, ...dataRows, ytdRow]);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:10},
+    {wch:14},{wch:10},{wch:10},{wch:8},
+    {wch:12},{wch:10},{wch:10},{wch:8},{wch:10},{wch:12},
+    {wch:12},{wch:10},{wch:10},{wch:8},{wch:10},{wch:12},
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '年度汇总');
+  XLSX.writeFile(wb, `${zn}人力成本年度汇总.xlsx`);
+  showToast('年度汇总已导出');
+}
+
+// ==============================================
+// TEMPLATE DOWNLOAD
+// ==============================================
+function downloadCostTemplate() {
+  const headers = ['二级部门','三级部门','四级部门','工号','姓名','新职级','职务（岗位）','所属周期',
+    '人工成本','店端绩效奖金','季度奖金应发','法定加班费','平日加班费','周末加班费',
+    '轮班津贴','出差津贴','外派津贴','离职补偿金','竞业补偿金','签约奖金',
+    '奖金计提','挑战奖金计提','社保公积金（企业）','社保公积金（个人）',
+    '城市NOA项目特殊激励','战略奖特殊激励','二手车置换奖金','是否计数'];
+
+  const zn = window._zoneName || '江西战区';
+  const p1 = zn.replace('战区','') + '一部';
+  const p2 = zn.replace('战区','') + '二部';
+  const samples = [
+    [zn, p1, p1.replace('部','')+'长泰零售中心','052101','张三','14','高级销售顾问','2026/02',
+      28000,8000,0,2000,0,0,0,0,0,0,0,0,0,0,6800,3600,0,0,0,'是'],
+    [zn, p1, p1.replace('部','')+'长泰零售中心','052102','李四','16','零售店长','2026/02',
+      55000,15000,0,3500,0,0,0,300,0,0,0,0,0,0,12000,6400,0,0,2000,'是'],
+    [zn, p2, p2.replace('部','')+'示例零售中心','052103','王五','13','销售顾问','2026/02',
+      22000,6000,0,1500,0,0,0,0,0,0,0,0,0,0,5500,2900,0,0,0,'是'],
+    [zn,'交付','示例交付中心','052104','赵六','14','PDI专员','2026/02',
+      24000,7000,0,1200,0,0,0,0,0,0,0,0,0,0,6200,3300,0,0,0,'是'],
+    [zn,'交付','示例交付中心','052105','钱七','15','高级交付专家','2026/02',
+      32000,10000,0,0,0,0,0,0,0,0,0,0,0,0,7800,4100,0,0,0,'是'],
+    [zn,'区域获客','','052106','孙八','15','区域获客专员','2026/02',
+      38000,6000,0,4000,0,0,0,1000,0,0,0,0,0,0,8000,4300,0,0,0,'是'],
+    [zn,'','','052107','周九','19','战区总经理','2026/02',
+      86000,0,0,23000,0,0,0,0,6000,0,0,0,6332,0,8100,5200,0,0,0,'是'],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
+
+  // Column widths
+  ws['!cols'] = headers.map((h,i) => ({wch: i===0?12 : i===1||i===2?16 : i===3?10 : i===4?10 : i===5?6 : i===6?14 : i===7?10 : 10}));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '成本数据');
+
+  // Add instruction sheet
+  const instrData = [
+    ['📋 成本数据导入说明',''],
+    ['',''],
+    ['列名','说明'],
+    ['二级部门','固定填写：' + zn],
+    ['三级部门','填写部门，如：'+p1+'、'+p2+'、交付、区域获客、零售运营、销售策略；战区总经理留空'],
+    ['四级部门','填写具体门店名，如：江西长泰零售中心；非门店岗位留空'],
+    ['工号','员工工号（6位数字），用于与个人定单数据匹配'],
+    ['姓名','员工姓名'],
+    ['新职级','员工职级编号，如：13、14、15、16、19'],
+    ['职务（岗位）','岗位名称'],
+    ['所属周期','格式：YYYY/MM，如：2026/02'],
+    ['人工成本','当月实际发放总人工成本（元）'],
+    ['店端绩效奖金','绩效成本组成项（元）'],
+    ['季度奖金应发','绩效成本组成项（元）'],
+    ['奖金计提','绩效成本组成项（元）'],
+    ['二手车置换奖金','绩效成本组成项（元）'],
+    ['法定加班费','固定成本明细项（元）'],
+    ['出差津贴','固定成本明细项（元）'],
+    ['社保公积金（企业）','固定成本明细项（元）'],
+    ['是否计数','填写"是"表示纳入在编人数统计（实习生填"否"）'],
+    ['',''],
+    ['⚠️ 注意','绩效成本 = 店端绩效奖金 + 季度奖金应发 + 奖金计提 + 二手车置换奖金'],
+    ['','固定成本 = 人工成本 - 绩效成本'],
+  ];
+  const wsInstr = XLSX.utils.aoa_to_sheet(instrData);
+  wsInstr['!cols'] = [{wch:24},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, wsInstr, '填写说明');
+
+  XLSX.writeFile(wb, '成本数据导入模板.xlsx');
+  showToast('成本数据模板已下载');
+}
+
+function downloadOrderTemplate() {
+  const headers = ['人力口径门店','定单量','定单目标','达成率'];
+
+  // Build sample rows from current loaded data grouped by dept
+  const deptNames = [...new Set(state.retailStores.map(s=>s.dept).filter(d=>d))].sort();
+  let sampleRows = [];
+  let rowNum = 2;
+  deptNames.forEach(dept => {
+    const stores = state.retailStores.filter(s=>s.dept===dept);
+    const deptActual = stores.reduce((a,s)=>a+(s.orders_actual||0),0);
+    const deptTarget = stores.reduce((a,s)=>a+(s.orders_target||0),0);
+    sampleRows.push([dept, deptActual, deptTarget, `=B${rowNum}/C${rowNum}`]);
+    rowNum++;
+    stores.forEach(s => {
+      sampleRows.push([s.name, s.orders_actual||0, s.orders_target||0, `=B${rowNum}/C${rowNum}`]);
+      rowNum++;
+    });
+  });
+  const totalActual = state.retailStores.reduce((a,s)=>a+(s.orders_actual||0),0);
+  const totalTarget = state.retailStores.reduce((a,s)=>a+(s.orders_target||0),0);
+  sampleRows.push(['总计', totalActual, totalTarget, `=B${rowNum}/C${rowNum}`]);
+  sampleRows.push(['交付量总计', state.deliveryTotal||0, '', '']);
+
+  const zn = window._zoneName || '战区';
+  const p1 = [...new Set(state.retailStores.map(s=>s.dept).filter(d=>d))].sort()[0] || (zn.replace('战区','')+'一部');
+  const p2 = [...new Set(state.retailStores.map(s=>s.dept).filter(d=>d))].sort()[1] || (zn.replace('战区','')+'二部');
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+  ws['!cols'] = [{wch:36},{wch:12},{wch:12},{wch:10}];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '定单数据');
+
+  // Instruction sheet
+  const instrData = [
+    ['📋 定单数据导入说明',''],
+    ['',''],
+    ['列名','说明'],
+    ['人力口径门店','门店名称，需与成本数据中的四级部门名保持一致；可填写'+p1+'/'+p2+'作为小计行'],
+    ['定单量','本月实际完成定单数量'],
+    ['定单目标','本月计划目标定单数量'],
+    ['达成率','可用公式 =定单量/定单目标，或直接填写小数（如0.75表示75%）'],
+    ['',''],
+    ['⚠️ 注意','1. "总计"行为必填，系统将读取总计行作为战区汇总指标'],
+    ['','2. 门店名称需与成本数据中四级部门字段保持一致，否则无法关联'],
+    ['','3. 达成率列可留空，系统会自动计算'],
+    ['','4. "交付量总计"行填写该月交付门店合计交付量（仅填第二列数值，无需目标和达成率）'],
+  ];
+  const wsInstr = XLSX.utils.aoa_to_sheet(instrData);
+  wsInstr['!cols'] = [{wch:24},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, wsInstr, '填写说明');
+
+  XLSX.writeFile(wb, '定单数据导入模板.xlsx');
+  showToast('定单数据模板已下载');
+}
+
+// ==============================================
+// PERSONAL ORDER IMPORT
+// ==============================================
+function handlePersonalOrderFile(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+      const orderMap = processPersonalOrderData(rows);
+      if (!orderMap) { showToast('个人定单数据格式有误','error'); setBtnError('btnPersonal','personalLabel','格式错误'); return; }
+
+      const monthData = monthDataCache[importYM] || {
+        period: ymToLabel(importYM), retailStores:[], supportDepts:[], deliveryStores:[], deliverySupport:[], employees:[]
+      };
+      if (!monthData.employees) monthData.employees = [];
+
+      let matched = 0;
+      const pending = { ...(monthData._pendingEmployeeOrders || {}) };
+      monthData.employees.forEach(emp => {
+        const id = String(emp.id || '').trim();
+        if (!id || orderMap[id] === undefined) return;
+        emp.orders = orderMap[id].orders;
+        delete pending[id];
+        matched++;
+      });
+      Object.values(orderMap).forEach(entry => {
+        if (!monthData.employees.find(e => String(e.id || '').trim() === entry.id)) {
+          pending[entry.id] = entry;
+        }
+      });
+      if (Object.keys(pending).length) monthData._pendingEmployeeOrders = pending;
+      else delete monthData._pendingEmployeeOrders;
+
+      await apiSaveData(importYM, monthData);
+      if (!allMonthKeys.includes(importYM)) { allMonthKeys.unshift(importYM); allMonthKeys.sort().reverse(); }
+      currentYM = importYM;
+      monthDataCache[importYM] = monthData;
+      state = JSON.parse(JSON.stringify(monthData));
+      renderMonthBar();
+      setBtnLoaded('btnPersonal','personalLabel', file.name);
+      const pendingCount = Object.keys(pending).length;
+      showToast(`个人定单数据已保存至 ${ymToLabel(importYM)}（${Object.keys(orderMap).length} 条 / 匹配 ${matched} 人 / 待补齐 ${pendingCount} 人）`);
+      renderAll();
+    } catch(err) { showToast('导入失败：'+err.message,'error'); setBtnError('btnPersonal','personalLabel','导入失败'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function processPersonalOrderData(rows) {
+  if (!rows || rows.length < 2) return null;
+  const header = rows[0];
+  if (!header) return null;
+  const ci = name => header.findIndex(h => h && String(h).includes(name));
+  const iId     = ci('工号') >= 0 ? ci('工号') : ci('专家工号') >= 0 ? ci('专家工号') : 0;
+  const iName   = ci('姓名') >= 0 ? ci('姓名') : ci('专家姓名') >= 0 ? ci('专家姓名') : 1;
+  const iOrders = ci('净锁单') >= 0 ? ci('净锁单') : ci('定单') >= 0 ? ci('定单') : 2;
+
+  const map = {};
+  rows.slice(1).filter(r => r[iId]).forEach(r => {
+    const id = String(r[iId]).trim();
+    if (id) map[id] = { id, name: String(r[iName]||'').trim(), orders: Number(r[iOrders])||0 };
+  });
+  return Object.keys(map).length > 0 ? map : null;
+}
+
+function downloadPersonalOrderTemplate() {
+  const headers = ['专家工号','专家姓名','MTD净锁单量'];
+  const samples = [
+    ['052101','张三',15],
+    ['052102','李四',22],
+    ['052103','王五',18],
+    ['052104','赵六',9],
+    ['052105','钱七',31],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
+  ws['!cols'] = [{wch:12},{wch:10},{wch:14}];
+
+  const instrData = [
+    ['📋 个人定单数据导入说明',''],
+    ['',''],
+    ['列名','说明'],
+    ['专家工号','6位员工工号，需与成本数据中的工号一致，用于自动匹配'],
+    ['专家姓名','员工姓名（可选，用于核对）'],
+    ['MTD净锁单量','月度累计净锁单量（整数）'],
+    ['',''],
+    ['⚠️ 注意','工号需与成本数据模板中的"工号"列保持一致，否则无法匹配'],
+    ['','格式与 reserve-manager-tracker 系统导出的"导入人员月度定单明细"兼容'],
+  ];
+  const wsInstr = XLSX.utils.aoa_to_sheet(instrData);
+  wsInstr['!cols'] = [{wch:20},{wch:60}];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '个人定单数据');
+  XLSX.utils.book_append_sheet(wb, wsInstr, '填写说明');
+  XLSX.writeFile(wb, '个人定单数据导入模板.xlsx');
+  showToast('个人定单数据模板已下载');
+}
+// ==============================================
+function ymToLabel(ym) {
+  if (!ym) return '';
+  const [y, m] = ym.split('-');
+  return `${y}年${parseInt(m)}月`;
+}
+
+function initImportPicker() {
+  const yearSel = document.getElementById('importYear');
+  const monthSel = document.getElementById('importMonth');
+  yearSel.innerHTML = '';
+  for (let y = 2024; y <= 2027; y++) {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    yearSel.appendChild(opt);
+  }
+  monthSel.innerHTML = '';
+  for (let m = 1; m <= 12; m++) {
+    const opt = document.createElement('option');
+    opt.value = String(m).padStart(2,'0'); opt.textContent = m;
+    monthSel.appendChild(opt);
+  }
+  // Set to importYM
+  const [iy, im] = importYM.split('-');
+  yearSel.value = iy;
+  monthSel.value = im;
+}
+
+function syncImportPicker() {
+  const y = document.getElementById('importYear').value;
+  const m = document.getElementById('importMonth').value;
+  importYM = `${y}-${m}`;
+}
+
+function renderMonthBar() {
+  const chips = document.getElementById('monthChips');
+  if (!chips) return;
+  const keys = sortedMonthKeys();
+  if (!keys.length) { chips.innerHTML = '<span style="font-size:11px;color:var(--gray)">暂无已存储数据</span>'; return; }
+  chips.innerHTML = keys.map(ym => {
+    const active = ym === currentYM;
+    return `<button class="month-chip${active?' active':''}" onclick="loadMonth('${ym}')">${ymToLabel(ym)}</button>`;
+  }).join('');
+}
+
+async function loadMonth(ym) {
+  const data = await apiGetData(ym);
+  if (!data) { showToast('该月份无数据','error'); return; }
+  currentYM = ym;
+  state = JSON.parse(JSON.stringify(data));
+  renderMonthBar();
+  renderAll();
+  showToast(`已切换至 ${ymToLabel(ym)}`);
+}
+
+async function openManageModal() {
+  const modal = document.getElementById('manageModal');
+  const content = document.getElementById('modalContent');
+  const keys = sortedMonthKeys();
+  modal.classList.add('show');
+  if (!keys.length) {
+    content.innerHTML = '<p style="text-align:center;color:var(--gray);font-size:12px;padding:16px">暂无已存储的月份数据</p>';
+    return;
+  }
+  // Show loading state
+  content.innerHTML = '<p style="text-align:center;color:var(--gray);font-size:12px;padding:16px">加载中…</p>';
+  // Fetch any uncached months
+  await Promise.all(keys.filter(ym => !monthDataCache[ym]).map(ym => apiGetData(ym)));
+  content.innerHTML = keys.map(ym => {
+    const d = monthDataCache[ym] || {};
+    const stores = (d.retailStores||[]).length + (d.deliveryStores||[]).length;
+    const support = (d.supportDepts||[]).length + (d.deliverySupport||[]).length;
+    return `<div class="modal-month-row">
+      <div><div class="m-name">${ymToLabel(ym)}</div><div class="m-info">${stores} 个门店 · ${support} 个支持部门</div></div>
+      <button class="modal-del-btn" onclick="confirmDelete('${ym}')">删除</button>
+    </div>`;
+  }).join('');
+}
+
+function closeManageModal() {
+  document.getElementById('manageModal').classList.remove('show');
+}
+
+async function confirmDelete(ym) {
+  if (!confirm(`确认删除 ${ymToLabel(ym)} 的数据？此操作不可撤销。`)) return;
+  await apiDeleteData(ym);
+  allMonthKeys = allMonthKeys.filter(k => k !== ym);
+  if (currentYM === ym) {
+    currentYM = allMonthKeys[0] || DEFAULT_YM;
+    const d = await apiGetData(currentYM);
+    state = JSON.parse(JSON.stringify(d || { period:'—', retailStores:[], supportDepts:[], deliveryStores:[], deliverySupport:[] }));
+    renderAll();
+  }
+  renderMonthBar();
+  openManageModal();
+  showToast(`已删除 ${ymToLabel(ym)} 数据`);
+}
+
+// ==============================================
+// ROLE-BASED UI
+// ==============================================
+const ROLE_LABELS = { admin:'管理员', retail:'零售用户', delivery:'交付用户' };
+
+function applyRoleUI(user) {
+  const isAdmin = user.role === 'admin';
+  const isRetail = user.role === 'retail';
+  const isDelivery = user.role === 'delivery';
+
+  // User badge
+  document.getElementById('userNameBadge').textContent = user.name || user.username;
+  document.getElementById('roleBadge').textContent = ROLE_LABELS[user.role] || user.role;
+
+  // Import bar: admin only
+  document.getElementById('importBar').style.display = isAdmin ? '' : 'none';
+  document.getElementById('monthBarEl').style.display = '';
+
+  // Tabs: hide based on role
+  document.querySelector('[onclick="switchTab(\'overview\')"]').style.display = isAdmin ? '' : 'none';
+  document.querySelector('[onclick="switchTab(\'retail\')"]').style.display = isDelivery ? 'none' : '';
+  document.querySelector('[onclick="switchTab(\'delivery\')"]').style.display = isRetail ? 'none' : '';
+  document.querySelector('[onclick="switchTab(\'personnel\')"]').style.display = isAdmin ? '' : '';
+  document.querySelector('[onclick="switchTab(\'annual\')"]').style.display = isAdmin ? '' : 'none';
+  // Personnel tab panel visibility based on role data filtering is handled in renderPersonnel()
+
+  // Default tab
+  if (isRetail) switchTab('retail');
+  else if (isDelivery) switchTab('delivery');
+  else switchTab('overview');
+
+  // Admin panel
+  document.getElementById('userPanel').style.display = isAdmin ? '' : 'none';
+  if (isAdmin) renderUserPanel();
+
+  // Export button: admin only
+  const exportBtns = document.querySelectorAll('.export-btn');
+  exportBtns.forEach(b => b.style.display = isAdmin ? '' : 'none');
+
+  // Support dept section in retail: hide for non-admin retail users
+  const retailSupportCard = document.getElementById('retailSupportCard');
+  if (retailSupportCard) retailSupportCard.style.display = isAdmin ? '' : 'none';
+
+  // Delivery support in delivery tab: hide for non-admin delivery users
+  const deliverySupportCard = document.getElementById('deliverySupportCard');
+  if (deliverySupportCard) deliverySupportCard.style.display = isAdmin ? '' : 'none';
+}
+
+// ==============================================
+// LOGOUT
+// ==============================================
+async function doLogout() {
+  await fetch('/api/logout', { method:'POST' });
+  window.location.href = '/';
+}
+
+// ==============================================
+// USER MANAGEMENT (admin only)
+// ==============================================
+let usersCache = [];
+async function renderUserPanel() {
+  const r = await apiFetch('/api/users');
+  if (!r) return;
+  usersCache = await r.json();
+  document.getElementById('userList').innerHTML = usersCache.map(u => `
+    <div class="u-card">
+      <span>${u.name}</span>
+      <span style="color:var(--gray);font-size:11px">${u.username}</span>
+      <span class="u-role-tag tag-${u.role}">${ROLE_LABELS[u.role]}</span>
+      <button class="u-del-btn" onclick="deleteUser('${u.username}')">删除</button>
+      <button class="u-del-btn" style="color:var(--primary)" onclick="resetPwd('${u.username}')">改密</button>
+    </div>`).join('');
+}
+
+function showAddUserModal() {
+  const role = prompt('角色（admin/retail/delivery）：');
+  if (!['admin','retail','delivery'].includes(role)) { alert('角色无效'); return; }
+  const username = prompt('用户名：');
+  if (!username) return;
+  const password = prompt('密码（至少6位）：');
+  if (!password || password.length < 6) { alert('密码至少6位'); return; }
+  const name = prompt('显示名称：') || username;
+  apiFetch('/api/users', { method:'POST', body: JSON.stringify({ username, password, role, name }) })
+    .then(r => r?.json()).then(d => {
+      if (d?.success) { showToast('账号已创建'); renderUserPanel(); }
+      else showToast(d?.error || '创建失败', 'error');
+    });
+}
+
+async function deleteUser(username) {
+  if (!confirm(`确认删除用户 ${username}？`)) return;
+  const r = await apiFetch(`/api/users/${username}`, { method:'DELETE' });
+  const d = await r?.json();
+  if (d?.success) { showToast('已删除'); renderUserPanel(); }
+  else showToast(d?.error || '删除失败', 'error');
+}
+
+async function resetPwd(username) {
+  const pwd = prompt(`为 ${username} 设置新密码（至少6位）：`);
+  if (!pwd || pwd.length < 6) { alert('密码至少6位'); return; }
+  const r = await apiFetch(`/api/users/${username}/password`, { method:'PATCH', body: JSON.stringify({ password: pwd }) });
+  const d = await r?.json();
+  if (d?.success) showToast('密码已更新');
+  else showToast(d?.error || '更新失败', 'error');
+}
+
+async function offlineExport() {
+  try {
+    showToast('正在生成离线看板…');
+    const r = await fetch('/api/offline-export');
+    if (!r.ok) { showToast('生成失败', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '人力成本分析看板_离线版.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('离线看板已下载');
+  } catch (e) { showToast('导出失败：' + e.message, 'error'); }
+}
+
+async function offlineExportFull() {
+  try {
+    showToast('正在生成全量离线看板…');
+    const r = await fetch('/api/offline-export-full');
+    if (!r.ok) { showToast('生成失败', 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const zn = window._zoneName || '人力成本';
+    a.download = zn + '分析看板_全量信息.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('全量离线看板已下载');
+  } catch (e) { showToast('导出失败：' + e.message, 'error'); }
+}
+
+// ==============================================
+// INIT
+// ==============================================
+async function init() {
+  // Verify session
+  const meR = await apiFetch('/api/me');
+  if (!meR || !meR.ok) { window.location.href = '/'; return; }
+  currentUser = await meR.json();
+
+  // Load zone config
+  try {
+    const cfgR = await fetch('/api/config');
+    if (cfgR.ok) {
+      const cfg = await cfgR.json();
+      window._zoneName = cfg.zoneName || '江西战区';
+    } else {
+      window._zoneName = '江西战区';
+    }
+  } catch(e) { window._zoneName = '江西战区'; }
+  document.title = window._zoneName + '人力成本分析看板';
+  document.querySelector('.header h1').textContent = window._zoneName + '人力成本分析看板';
+
+  // Load months list
+  await apiGetMonths();
+  currentYM = allMonthKeys[0] || DEFAULT_YM;
+  importYM = nextMonthAfterLatest();
+
+  // Pre-fetch current and prev month
+  const [curData, prevData] = await Promise.all([
+    apiGetData(currentYM),
+    apiGetData(getPrevYM(currentYM))
+  ]);
+  if (curData) state = JSON.parse(JSON.stringify(curData));
+
+  // Apply role-based UI
+  applyRoleUI(currentUser);
+
+  // Init pickers
+  initImportPicker();
+  renderMonthBar();
+  renderAll();
+}
+
+init();
+</script>
+</body>
+</html>
