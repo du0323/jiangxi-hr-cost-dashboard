@@ -2,16 +2,22 @@ services:
   - type: web
     name: jiangxi-hr-cost-dashboard
     runtime: node
-    plan: free
+    plan: starter
     rootDir: .
     buildCommand: npm install
     startCommand: npm start
+    disk:
+      name: jiangxi-hr-cost-dashboard-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: ZONE_NAME
         value: 江西战区
       - key: DATA_DIR
-        value: data
+        value: /var/data/months
+      - key: USERS_FILE
+        value: /var/data/users/users.json
       - key: SESSION_SECRET
         generateValue: true

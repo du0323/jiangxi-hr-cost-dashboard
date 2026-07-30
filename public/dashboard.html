@@ -42,6 +42,21 @@ body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg)
 .period-info{font-size:12px;color:var(--primary);font-weight:600;background:var(--primary-light);padding:4px 12px;border-radius:14px}
 .import-tip{font-size:11px;color:var(--gray)}
 
+/* UPLOAD PREVIEW */
+.preview-board{padding:12px 20px 0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.preview-card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:14px}
+.preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.preview-title{font-size:13px;font-weight:700;color:var(--primary-dark)}
+.preview-sub{font-size:11px;color:var(--gray);margin-top:2px}
+.preview-count{font-size:11px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:3px 9px;border-radius:999px;white-space:nowrap}
+.preview-table-wrap{overflow:auto;max-height:240px;border:1px solid #eef2f1;border-radius:8px}
+.preview-table{width:100%;border-collapse:collapse;font-size:11px}
+.preview-table th,.preview-table td{padding:7px 8px;border-bottom:1px solid #eef2f1;text-align:left;white-space:nowrap}
+.preview-table th{position:sticky;top:0;background:#f8fafc;color:var(--gray);font-weight:600;z-index:1}
+.preview-table tr:last-child td{border-bottom:none}
+.preview-empty{padding:22px 12px;text-align:center;font-size:11px;color:var(--gray)}
+.preview-meta{margin-top:8px;font-size:11px;color:var(--gray)}
+
 /* KPI CARDS */
 .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:12px 20px 0}
 .kpi-card{background:var(--card);border-radius:10px;padding:12px 14px;border:1px solid var(--border);border-top:3px solid var(--primary)}
@@ -257,11 +272,11 @@ tbody tr:last-child td{border-bottom:none}
 
   <div class="bar-sep"></div>
 
-  <!-- 成本数据 -->
+  <!-- 花名册 -->
   <div class="import-group">
     <label class="import-btn" id="btnCost">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      <span id="costLabel">导入成本数据</span>
+      <span id="costLabel">导入花名册</span>
       <input type="file" accept=".xlsx,.xls" id="fileCost" onchange="handleCostFile(this)">
     </label>
     <button class="tpl-btn" onclick="downloadCostTemplate()">
@@ -300,6 +315,48 @@ tbody tr:last-child td{border-bottom:none}
 
   <div class="bar-sep"></div>
   <span class="import-tip">支持 .xlsx 格式，导入后自动保存至所选月份</span>
+</div>
+
+<div class="preview-board" id="previewBoard">
+  <div class="preview-card">
+    <div class="preview-head">
+      <div>
+        <div class="preview-title">花名册预览</div>
+        <div class="preview-sub">展示已导入人员信息摘要</div>
+      </div>
+      <span class="preview-count" id="costPreviewCount">0 条</span>
+    </div>
+    <div class="preview-table-wrap" id="costPreviewWrap">
+      <div class="preview-empty">暂未导入花名册</div>
+    </div>
+    <div class="preview-meta" id="costPreviewMeta">上传后可直接核对工号、姓名、部门、门店与人工成本。</div>
+  </div>
+  <div class="preview-card">
+    <div class="preview-head">
+      <div>
+        <div class="preview-title">定单数据预览</div>
+        <div class="preview-sub">展示门店定单量与目标</div>
+      </div>
+      <span class="preview-count" id="orderPreviewCount">0 条</span>
+    </div>
+    <div class="preview-table-wrap" id="orderPreviewWrap">
+      <div class="preview-empty">暂未导入定单数据</div>
+    </div>
+    <div class="preview-meta" id="orderPreviewMeta">上传后可直接查看门店、定单量、目标和达成率。</div>
+  </div>
+  <div class="preview-card">
+    <div class="preview-head">
+      <div>
+        <div class="preview-title">个人定单预览</div>
+        <div class="preview-sub">展示员工个人定单明细</div>
+      </div>
+      <span class="preview-count" id="personalPreviewCount">0 条</span>
+    </div>
+    <div class="preview-table-wrap" id="personalPreviewWrap">
+      <div class="preview-empty">暂未导入个人定单数据</div>
+    </div>
+    <div class="preview-meta" id="personalPreviewMeta">上传后可直接核对工号、姓名和个人定单量。</div>
+  </div>
 </div>
 
 <!-- MONTH BAR -->
@@ -664,6 +721,11 @@ function nextMonthAfterLatest() {
 // STATE
 // ==============================================
 let state = { period:'—', retailStores:[], supportDepts:[], deliveryStores:[], deliverySupport:[], employees:[] };
+let uploadPreview = {
+  cost: { rows: [], meta: '上传后可直接核对工号、姓名、部门、门店与人工成本。' },
+  order: { rows: [], meta: '上传后可直接查看门店、定单量、目标和达成率。' },
+  personal: { rows: [], meta: '上传后可直接核对工号、姓名和个人定单量。' }
+};
 let charts = {};
 let filterState = { dept:'', names:[], rate:'' };
 let sortState = { field: null, dir: -1 };
@@ -705,6 +767,85 @@ function fixedBadge(fp) {
   return `<div style="display:flex;align-items:center;gap:5px;justify-content:center">
     <div class="ratio-bar"><div class="ratio-fixed" style="width:${fp}%"></div><div class="ratio-perf" style="width:${100-fp}%"></div></div>
     <span style="font-weight:700;font-size:11px;color:${col}">${fp}%</span></div>`;
+}
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function updatePreviewCard(kind, columns, rows, meta) {
+  const countEl = document.getElementById(`${kind}PreviewCount`);
+  const wrapEl = document.getElementById(`${kind}PreviewWrap`);
+  const metaEl = document.getElementById(`${kind}PreviewMeta`);
+  if (!countEl || !wrapEl || !metaEl) return;
+  countEl.textContent = `${rows.length} 条`;
+  metaEl.textContent = meta;
+  if (!rows.length) {
+    wrapEl.innerHTML = `<div class="preview-empty">暂无可预览内容</div>`;
+    return;
+  }
+  const headerHtml = columns.map(col => `<th>${escapeHtml(col.label)}</th>`).join('');
+  const bodyHtml = rows.map(row => `<tr>${columns.map(col => `<td>${escapeHtml(row[col.key] ?? '—')}</td>`).join('')}</tr>`).join('');
+  wrapEl.innerHTML = `<table class="preview-table"><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+}
+function buildCostPreviewRows(data) {
+  return (data.employees || []).slice(0, 50).map(emp => ({
+    id: emp.id || '—',
+    name: emp.name || '—',
+    dept: emp.dept || emp.cat || '—',
+    store: emp.store || '—',
+    labor: Number(emp.labor || 0).toLocaleString('zh-CN')
+  }));
+}
+function buildOrderPreviewRows(data) {
+  return (data.retailStores || []).slice(0, 50).map(store => ({
+    name: store.name || '—',
+    dept: store.dept || '—',
+    actual: store.orders_actual == null ? '—' : store.orders_actual,
+    target: store.orders_target == null ? '—' : store.orders_target,
+    rate: store.orders_actual != null && store.orders_target ? `${(store.orders_actual / store.orders_target * 100).toFixed(1)}%` : '—'
+  }));
+}
+function buildPersonalPreviewRows(data) {
+  return (data.employees || [])
+    .filter(emp => emp.orders != null)
+    .slice(0, 50)
+    .map(emp => ({
+      id: emp.id || '—',
+      name: emp.name || '—',
+      title: emp.title || '—',
+      store: emp.store || '—',
+      orders: emp.orders
+    }));
+}
+function syncPreviewFromState() {
+  const costRows = uploadPreview.cost.rows.length ? uploadPreview.cost.rows : buildCostPreviewRows(state);
+  const orderRows = uploadPreview.order.rows.length ? uploadPreview.order.rows : buildOrderPreviewRows(state);
+  const personalRows = uploadPreview.personal.rows.length ? uploadPreview.personal.rows : buildPersonalPreviewRows(state);
+  updatePreviewCard('cost', [
+    { key: 'id', label: '工号' },
+    { key: 'name', label: '姓名' },
+    { key: 'dept', label: '部门' },
+    { key: 'store', label: '门店' },
+    { key: 'labor', label: '人工成本' }
+  ], costRows, uploadPreview.cost.meta);
+  updatePreviewCard('order', [
+    { key: 'name', label: '门店' },
+    { key: 'dept', label: '部门' },
+    { key: 'actual', label: '定单量' },
+    { key: 'target', label: '定单目标' },
+    { key: 'rate', label: '达成率' }
+  ], orderRows, uploadPreview.order.meta);
+  updatePreviewCard('personal', [
+    { key: 'id', label: '工号' },
+    { key: 'name', label: '姓名' },
+    { key: 'title', label: '岗位' },
+    { key: 'store', label: '门店' },
+    { key: 'orders', label: '个人定单量' }
+  ], personalRows, uploadPreview.personal.meta);
 }
 function sum(arr,f){return arr.reduce((a,b)=>a+(b[f]||0),0)}
 function showToast(msg, type='success') {
@@ -821,13 +962,17 @@ function handleCostFile(input) {
       const remainingOrders = applyEmployeeOrders(newData.employees, collectEmployeeOrdersById(existing));
       if (Object.keys(remainingOrders).length) newData._pendingEmployeeOrders = remainingOrders;
 
+      uploadPreview.cost = {
+        rows: buildCostPreviewRows(newData),
+        meta: `${ymToLabel(importYM)} · 花名册 ${newData.employees.length} 条，显示前 ${Math.min(newData.employees.length, 50)} 条`
+      };
       await apiSaveData(importYM, newData);
       if (!allMonthKeys.includes(importYM)) { allMonthKeys.unshift(importYM); allMonthKeys.sort().reverse(); }
       currentYM = importYM;
       state = JSON.parse(JSON.stringify(newData));
       renderMonthBar();
       setBtnLoaded('btnCost','costLabel', file.name);
-      showToast(`成本数据已保存至 ${ymToLabel(importYM)}（${result.employees ? result.employees.length : rows.length-1} 条记录）`);
+      showToast(`花名册已保存至 ${ymToLabel(importYM)}（${result.employees ? result.employees.length : rows.length-1} 条记录）`);
       renderAll();
     } catch(err) { showToast('导入失败：'+err.message,'error'); setBtnError('btnCost','costLabel','导入失败'); }
   };
@@ -868,6 +1013,17 @@ function handleOrderFile(input) {
         }
       });
       if(deliveryTotal != null) monthData.deliveryTotal = deliveryTotal;
+      const previewRows = Object.entries(orderMap).slice(0, 50).map(([name, value]) => ({
+        name,
+        dept: value.dept || '—',
+        actual: value.actual,
+        target: value.target,
+        rate: value.target ? `${(value.actual / value.target * 100).toFixed(1)}%` : '—'
+      }));
+      uploadPreview.order = {
+        rows: previewRows,
+        meta: `${ymToLabel(importYM)} · 定单数据 ${Object.keys(orderMap).length} 条，显示前 ${previewRows.length} 条`
+      };
       await apiSaveData(importYM, monthData);
       currentYM = importYM;
       state = JSON.parse(JSON.stringify(monthData));
@@ -1160,6 +1316,7 @@ function getFilteredStores() {
 // ==============================================
 function renderAll() {
   updatePeriod();
+  syncPreviewFromState();
   renderKPIs();
   renderOverview();
   renderRetailSummary();
@@ -1740,6 +1897,70 @@ function median(arr) {
   return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
 }
 
+function getRetailShortName(name, maxLen = 8) {
+  const short = name.replace('零售中心','').replace('（外展店）','(外展)');
+  return short.length > maxLen ? short.slice(0, maxLen) + '…' : short;
+}
+
+function createRetailLabelPlugin() {
+  return {
+    id:'retailPointLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx, chartArea } = chart;
+      if (!chartArea) return;
+      const placed = [];
+      const points = chart.data.datasets.flatMap((dataset, datasetIndex) =>
+        (dataset.data || []).map((datum, index) => ({ datum, element: chart.getDatasetMeta(datasetIndex).data[index] }))
+      ).filter(item => item.element);
+
+      points.sort((a, b) => (b.datum.r || 0) - (a.datum.r || 0));
+
+      ctx.save();
+      ctx.font = '11px "PingFang SC",sans-serif';
+      ctx.textBaseline = 'middle';
+      points.forEach(({ datum, element }) => {
+        const label = datum.name;
+        if (!label) return;
+        const props = element.getProps(['x', 'y', 'options'], true);
+        const radius = props.options?.radius || datum.r || 0;
+        const textWidth = ctx.measureText(label).width;
+        const textHeight = 11;
+        const gap = radius + 6;
+        let textX = props.x + gap;
+        let align = 'left';
+
+        if (textX + textWidth > chartArea.right - 2) {
+          textX = props.x - gap - textWidth;
+          align = 'left';
+        }
+        if (textX < chartArea.left + 2) textX = chartArea.left + 2;
+
+        let textY = props.y - radius - 2;
+        if (textY - textHeight / 2 < chartArea.top + 2) textY = props.y + radius + 8;
+        if (textY + textHeight / 2 > chartArea.bottom - 2) textY = chartArea.bottom - textHeight / 2 - 2;
+
+        const box = {
+          left: textX - 2,
+          right: textX + textWidth + 2,
+          top: textY - textHeight / 2 - 1,
+          bottom: textY + textHeight / 2 + 1
+        };
+        const overlaps = placed.some(existing => !(box.right < existing.left || box.left > existing.right || box.bottom < existing.top || box.top > existing.bottom));
+        if (overlaps) return;
+        placed.push(box);
+
+        ctx.textAlign = align;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+        ctx.strokeText(label, textX, textY);
+        ctx.fillStyle = '#1f2937';
+        ctx.fillText(label, textX, textY);
+      });
+      ctx.restore();
+    }
+  };
+}
+
 function renderRetailCharts() {
   const filtered = getFilteredStores();
   const withOrders = filtered.filter(s=>s.orders_actual!=null);
@@ -1790,7 +2011,7 @@ function renderRetailCharts() {
 
   // ---- QUADRANT CHART ----
   const effRaw = filtered.filter(s=>s.count>0&&s.orders_actual!=null).map(s=>({
-    name: s.name.replace('零售中心','').replace('（外展店）','(外展)').substring(0,10),
+    name: getRetailShortName(s.name),
     fullName: s.name,
     x: Math.round(s.labor/s.count),
     y: parseFloat((s.orders_actual/s.count).toFixed(2)),
@@ -1852,6 +2073,7 @@ function renderRetailCharts() {
       ctx.restore();
     }
   };
+  const labelPlugin = createRetailLabelPlugin();
 
   charts.chartEffCost = new Chart(document.getElementById('chartEffCost'), {
     type:'bubble',
@@ -1862,9 +2084,10 @@ function renderRetailCharts() {
       borderColor: Q[q].border,
       borderWidth:1.5
     }))},
-    plugins:[quadPlugin],
+    plugins:[quadPlugin, labelPlugin],
     options:{
       responsive:true, maintainAspectRatio:false,
+      layout:{padding:{top:14,right:42,bottom:10,left:8}},
       plugins:{
         legend:{display:true, position:'top', labels:{boxWidth:10, font:{size:11}, padding:12}},
         tooltip:{callbacks:{label:ctx=>{
@@ -1895,7 +2118,7 @@ function renderQuadrantSummary(data, medX, medY) {
     defs.map(d=>{
       const stores = data.filter(s=>s.q===d.q);
       const tags = stores.length
-        ? stores.map(s=>`<span style="background:${d.bg};border:1px solid ${d.border};padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;color:${d.color}">${s.name}</span>`).join(' ')
+        ? stores.map(s=>`<span title="${s.fullName}" style="background:${d.bg};border:1px solid ${d.border};padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;color:${d.color}">${s.name}</span>`).join(' ')
         : '<span style="color:#aaa;font-size:11px">暂无门店</span>';
       return `<div style="background:${d.bg};border:1px solid ${d.border};border-radius:8px;padding:12px 14px">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
@@ -2169,7 +2392,7 @@ function renderPersonnel() {
   const personTbody = document.getElementById('personnelTbody');
 
   if (!employees.length) {
-    personTbody.innerHTML = '<tr><td colspan="8" class="no-data">暂无员工数据，请先导入成本数据</td></tr>';
+    personTbody.innerHTML = '<tr><td colspan="8" class="no-data">暂无员工数据，请先导入花名册</td></tr>';
     document.getElementById('personnelQuadrantSummary').innerHTML = '';
     destroyChart('chartPersonnel');
     return;
@@ -2628,11 +2851,11 @@ function downloadCostTemplate() {
   ws['!cols'] = headers.map((h,i) => ({wch: i===0?12 : i===1||i===2?16 : i===3?10 : i===4?10 : i===5?6 : i===6?14 : i===7?10 : 10}));
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '成本数据');
+  XLSX.utils.book_append_sheet(wb, ws, '花名册');
 
   // Add instruction sheet
   const instrData = [
-    ['📋 成本数据导入说明',''],
+    ['📋 花名册导入说明',''],
     ['',''],
     ['列名','说明'],
     ['二级部门','固定填写：' + zn],
@@ -2660,8 +2883,8 @@ function downloadCostTemplate() {
   wsInstr['!cols'] = [{wch:24},{wch:60}];
   XLSX.utils.book_append_sheet(wb, wsInstr, '填写说明');
 
-  XLSX.writeFile(wb, '成本数据导入模板.xlsx');
-  showToast('成本数据模板已下载');
+  XLSX.writeFile(wb, '花名册导入模板.xlsx');
+  showToast('花名册模板已下载');
 }
 
 function downloadOrderTemplate() {
@@ -2702,13 +2925,13 @@ function downloadOrderTemplate() {
     ['📋 定单数据导入说明',''],
     ['',''],
     ['列名','说明'],
-    ['人力口径门店','门店名称，需与成本数据中的四级部门名保持一致；可填写'+p1+'/'+p2+'作为小计行'],
+    ['人力口径门店','门店名称，需与花名册中的四级部门名保持一致；可填写'+p1+'/'+p2+'作为小计行'],
     ['定单量','本月实际完成定单数量'],
     ['定单目标','本月计划目标定单数量'],
     ['达成率','可用公式 =定单量/定单目标，或直接填写小数（如0.75表示75%）'],
     ['',''],
     ['⚠️ 注意','1. "总计"行为必填，系统将读取总计行作为战区汇总指标'],
-    ['','2. 门店名称需与成本数据中四级部门字段保持一致，否则无法关联'],
+    ['','2. 门店名称需与花名册中四级部门字段保持一致，否则无法关联'],
     ['','3. 达成率列可留空，系统会自动计算'],
     ['','4. "交付量总计"行填写该月交付门店合计交付量（仅填第二列数值，无需目标和达成率）'],
   ];
@@ -2755,6 +2978,18 @@ function handlePersonalOrderFile(input) {
       });
       if (Object.keys(pending).length) monthData._pendingEmployeeOrders = pending;
       else delete monthData._pendingEmployeeOrders;
+
+      const previewRows = Object.values(orderMap).slice(0, 50).map(entry => ({
+        id: entry.id,
+        name: entry.name || '—',
+        title: (monthData.employees.find(emp => String(emp.id || '').trim() === entry.id) || {}).title || '—',
+        store: (monthData.employees.find(emp => String(emp.id || '').trim() === entry.id) || {}).store || '—',
+        orders: entry.orders
+      }));
+      uploadPreview.personal = {
+        rows: previewRows,
+        meta: `${ymToLabel(importYM)} · 个人定单数据 ${Object.keys(orderMap).length} 条，显示前 ${previewRows.length} 条`
+      };
 
       await apiSaveData(importYM, monthData);
       if (!allMonthKeys.includes(importYM)) { allMonthKeys.unshift(importYM); allMonthKeys.sort().reverse(); }
@@ -2804,11 +3039,11 @@ function downloadPersonalOrderTemplate() {
     ['📋 个人定单数据导入说明',''],
     ['',''],
     ['列名','说明'],
-    ['专家工号','6位员工工号，需与成本数据中的工号一致，用于自动匹配'],
+    ['专家工号','6位员工工号，需与花名册中的工号一致，用于自动匹配'],
     ['专家姓名','员工姓名（可选，用于核对）'],
     ['MTD净锁单量','月度累计净锁单量（整数）'],
     ['',''],
-    ['⚠️ 注意','工号需与成本数据模板中的"工号"列保持一致，否则无法匹配'],
+    ['⚠️ 注意','工号需与花名册模板中的"工号"列保持一致，否则无法匹配'],
     ['','格式与 reserve-manager-tracker 系统导出的"导入人员月度定单明细"兼容'],
   ];
   const wsInstr = XLSX.utils.aoa_to_sheet(instrData);
@@ -2870,6 +3105,18 @@ async function loadMonth(ym) {
   if (!data) { showToast('该月份无数据','error'); return; }
   currentYM = ym;
   state = JSON.parse(JSON.stringify(data));
+  uploadPreview.cost = {
+    rows: [],
+    meta: `${ymToLabel(ym)} · 花名册 ${buildCostPreviewRows(data).length ? `显示前 ${buildCostPreviewRows(data).length} 条` : '暂无明细'}`
+  };
+  uploadPreview.order = {
+    rows: [],
+    meta: `${ymToLabel(ym)} · 定单数据 ${buildOrderPreviewRows(data).length ? `显示前 ${buildOrderPreviewRows(data).length} 条` : '暂无明细'}`
+  };
+  uploadPreview.personal = {
+    rows: [],
+    meta: `${ymToLabel(ym)} · 个人定单数据 ${buildPersonalPreviewRows(data).length ? `显示前 ${buildPersonalPreviewRows(data).length} 条` : '暂无明细'}`
+  };
   renderMonthBar();
   renderAll();
   showToast(`已切换至 ${ymToLabel(ym)}`);

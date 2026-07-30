@@ -1,4 +1,8 @@
 node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+.streamlit/secrets.toml
 .env
 *.log
 .DS_Store
