@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
-ALLOWED_PERSONNEL_TITLES = ["产品专家", "产品专员", "储备管理", "高级产品专家", "资深产品专家", "零售主管"]
+ALLOWED_PERSONNEL_TITLES = ["产品专家", "产品专员", "储备管理", "高级产品专家", "资深产品专家"]
 
 
 def current_month_key(today: Optional[date] = None) -> str:
@@ -700,6 +700,8 @@ def build_personnel_frame(data: dict[str, Any], exclude_interns: bool = True) ->
     for employee in data.get("employees") or []:
         if exclude_interns and employee.get("isIntern") is True:
             continue
+        if (employee.get("title") or "") == "零售主管":
+            continue
         rows.append(
             {
                 "工号": employee.get("id") or "",
@@ -761,6 +763,7 @@ def build_personnel_quadrant_frame(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame
     valid = frame.copy()
+    valid = valid[valid["岗位"] != "零售主管"]
     valid = valid[valid["个人成本"] > 0]
     if valid.empty:
         return valid
