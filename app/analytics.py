@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
 
 ALLOWED_PERSONNEL_TITLES = ["产品专家", "产品专员", "储备管理", "高级产品专家", "资深产品专家", "零售主管"]
 
 
-def current_month_key(today: date | None = None) -> str:
+def current_month_key(today: Optional[date] = None) -> str:
     current = today or date.today()
     return f"{current.year}-{current.month:02d}"
 
 
-def previous_month_key(ym: str) -> str | None:
+def previous_month_key(ym: str) -> Optional[str]:
     if not ym or "-" not in ym:
         return None
     year_text, month_text = ym.split("-", 1)
@@ -48,25 +48,25 @@ def _is_missing(value: Any) -> bool:
     return value is None or pd.isna(value)
 
 
-def format_number(value: float | int | None) -> str:
+def format_number(value: Optional[float]) -> str:
     if _is_missing(value):
         return "—"
     return f"{int(round(float(value))):,}"
 
 
-def format_wan(value: float | int | None, digits: int = 1) -> str:
+def format_wan(value: Optional[float], digits: int = 1) -> str:
     if _is_missing(value):
         return "—"
     return f"{float(value) / 10000:.{digits}f}"
 
 
-def format_percent(value: float | None, digits: int = 1) -> str:
+def format_percent(value: Optional[float], digits: int = 1) -> str:
     if _is_missing(value):
         return "—"
     return f"{float(value) * 100:.{digits}f}%"
 
 
-def format_delta_percent(current: float | int | None, previous: float | int | None, digits: int = 1) -> str | None:
+def format_delta_percent(current: Optional[float], previous: Optional[float], digits: int = 1) -> Optional[str]:
     if _is_missing(current) or _is_missing(previous) or float(previous) == 0:
         return None
     delta = (float(current) - float(previous)) / float(previous)
@@ -74,7 +74,7 @@ def format_delta_percent(current: float | int | None, previous: float | int | No
     return f"{sign}{delta * 100:.{digits}f}%"
 
 
-def format_change_text(current: float | int | None, previous: float | int | None, digits: int = 1) -> str:
+def format_change_text(current: Optional[float], previous: Optional[float], digits: int = 1) -> str:
     if _is_missing(current) or _is_missing(previous) or float(previous) == 0:
         return "—"
     delta = (float(current) - float(previous)) / float(previous)
@@ -110,7 +110,7 @@ def _median(values: list[float]) -> float:
     return float((ordered[middle - 1] + ordered[middle]) / 2)
 
 
-def _rate_bucket(rate: float | None) -> str:
+def _rate_bucket(rate: Optional[float]) -> str:
     if rate is None:
         return "暂无定单"
     if rate >= 1:
@@ -130,7 +130,7 @@ def _retail_groups(data: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dic
     return retail_stores, support_depts, delivery_stores, delivery_support
 
 
-def compute_kpis(data: dict[str, Any]) -> dict[str, float | int | None]:
+def compute_kpis(data: dict[str, Any]) -> dict[str, Optional[float]]:
     retail_stores, support_depts, delivery_stores, delivery_support = _retail_groups(data)
     all_retail = [*retail_stores, *support_depts]
     all_delivery = [*delivery_stores, *delivery_support]
@@ -168,7 +168,7 @@ def compute_kpis(data: dict[str, Any]) -> dict[str, float | int | None]:
     }
 
 
-def build_kpi_cards(data: dict[str, Any], prev_data: dict[str, Any] | None = None) -> list[dict[str, str | None]]:
+def build_kpi_cards(data: dict[str, Any], prev_data: Optional[dict[str, Any]] = None) -> list[dict[str, Optional[str]]]:
     current = compute_kpis(data)
     previous = compute_kpis(prev_data or {}) if prev_data else {}
     fixed_ratio = current["fixed_ratio"]
@@ -219,7 +219,7 @@ def build_kpi_cards(data: dict[str, Any], prev_data: dict[str, Any] | None = Non
     ]
 
 
-def build_module_summary(data: dict[str, Any], prev_data: dict[str, Any] | None = None, zone_name: str = "战区") -> pd.DataFrame:
+def build_module_summary(data: dict[str, Any], prev_data: Optional[dict[str, Any]] = None, zone_name: str = "战区") -> pd.DataFrame:
     retail_stores, support_depts, delivery_stores, delivery_support = _retail_groups(data)
     prev_retail, prev_support, prev_delivery, prev_delivery_support = _retail_groups(prev_data or {})
 
@@ -324,7 +324,7 @@ def build_store_cost_frame(data: dict[str, Any]) -> pd.DataFrame:
     return frame.sort_values("固定成本", ascending=False)
 
 
-def build_mom_comparison_frame(data: dict[str, Any], prev_data: dict[str, Any] | None = None) -> pd.DataFrame:
+def build_mom_comparison_frame(data: dict[str, Any], prev_data: Optional[dict[str, Any]] = None) -> pd.DataFrame:
     if not prev_data:
         return pd.DataFrame(columns=["模块", "本月", "上月", "环比", "差值"])
     retail_stores, support_depts, delivery_stores, delivery_support = _retail_groups(data)
@@ -391,7 +391,7 @@ def build_retail_notice(data: dict[str, Any]) -> str:
     return notice
 
 
-def build_retail_frame(data: dict[str, Any], prev_data: dict[str, Any] | None = None) -> pd.DataFrame:
+def build_retail_frame(data: dict[str, Any], prev_data: Optional[dict[str, Any]] = None) -> pd.DataFrame:
     prev_map = {str(store.get("name") or ""): store for store in (prev_data or {}).get("retailStores") or []}
     rows = []
     for store in data.get("retailStores") or []:
@@ -439,7 +439,7 @@ def build_retail_frame(data: dict[str, Any], prev_data: dict[str, Any] | None = 
     return frame.sort_values(["所属部门", "人工成本"], ascending=[True, False]).reset_index(drop=True)
 
 
-def filter_retail_frame(frame: pd.DataFrame, dept: str = "全部", stores: list[str] | None = None, rate_status: str = "全部") -> pd.DataFrame:
+def filter_retail_frame(frame: pd.DataFrame, dept: str = "全部", stores: Optional[list[str]] = None, rate_status: str = "全部") -> pd.DataFrame:
     if frame.empty:
         return frame
     filtered = frame.copy()
@@ -496,7 +496,7 @@ def add_retail_total_row(frame: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([frame, total_row], ignore_index=True)
 
 
-def build_retail_cost_frame(data: dict[str, Any], prev_data: dict[str, Any] | None = None) -> pd.DataFrame:
+def build_retail_cost_frame(data: dict[str, Any], prev_data: Optional[dict[str, Any]] = None) -> pd.DataFrame:
     prev_map = {str(store.get("name") or ""): store for store in (prev_data or {}).get("retailStores") or []}
     rows = []
     for store in data.get("retailStores") or []:
@@ -719,8 +719,8 @@ def build_personnel_frame(data: dict[str, Any], exclude_interns: bool = True) ->
 def filter_personnel_frame(
     frame: pd.DataFrame,
     dept: str = "全部",
-    stores: list[str] | None = None,
-    titles: list[str] | None = None,
+    stores: Optional[list[str]] = None,
+    titles: Optional[list[str]] = None,
 ) -> pd.DataFrame:
     if frame.empty:
         return frame

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
+from typing import Any, Optional
 
 
-def pick_preferred_employee(current: dict[str, Any] | None, candidate: dict[str, Any]) -> dict[str, Any]:
+def pick_preferred_employee(current: Optional[dict[str, Any]], candidate: dict[str, Any]) -> dict[str, Any]:
     if not current:
         return candidate
 
-    def score(employee: dict[str, Any] | None) -> int:
+    def score(employee: Optional[dict[str, Any]]) -> int:
         value = 0
         if employee and str(employee.get("store") or "").strip():
             value += 4
@@ -26,8 +26,8 @@ def pick_preferred_employee(current: dict[str, Any] | None, candidate: dict[str,
 
 
 def normalize_employees(
-    employees: list[dict[str, Any]] | None,
-    pending_source: dict[str, dict[str, Any]] | None,
+    employees: Optional[list[dict[str, Any]]],
+    pending_source: Optional[dict[str, dict[str, Any]]],
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
     pending = deepcopy(pending_source or {})
     deduped_by_id: dict[str, dict[str, Any]] = {}
@@ -108,7 +108,7 @@ def normalize_employees(
     return normalized, pending
 
 
-def normalize_month_data(data: dict[str, Any] | None) -> dict[str, Any] | None:
+def normalize_month_data(data: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
     if not isinstance(data, dict):
         return data
 

@@ -4,7 +4,7 @@ import base64
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 import requests
 import streamlit as st
@@ -17,7 +17,7 @@ class MonthRepository:
     def list_months(self) -> list[str]:
         raise NotImplementedError
 
-    def load_month(self, ym: str) -> dict[str, Any] | None:
+    def load_month(self, ym: str) -> Optional[dict[str, Any]]:
         raise NotImplementedError
 
     def save_month(self, ym: str, data: dict[str, Any]) -> None:
@@ -25,7 +25,7 @@ class MonthRepository:
 
 
 class LocalMonthRepository(MonthRepository):
-    def __init__(self, base_dir: str | Path):
+    def __init__(self, base_dir: Union[str, Path]):
         self.base_dir = Path(base_dir)
 
     def _file_path(self, ym: str) -> Path:
@@ -36,7 +36,7 @@ class LocalMonthRepository(MonthRepository):
             return []
         return sorted((path.stem for path in self.base_dir.glob("*.json")), reverse=True)
 
-    def load_month(self, ym: str) -> dict[str, Any] | None:
+    def load_month(self, ym: str) -> Optional[dict[str, Any]]:
         file_path = self._file_path(ym)
         if not file_path.exists():
             return None
@@ -76,7 +76,7 @@ class GitHubMonthRepository(MonthRepository):
         months = [item["name"].removesuffix(".json") for item in items if item.get("name", "").endswith(".json")]
         return sorted(months, reverse=True)
 
-    def load_month(self, ym: str) -> dict[str, Any] | None:
+    def load_month(self, ym: str) -> Optional[dict[str, Any]]:
         path = f"{self.data_dir}/{ym}.json"
         response = self.session.get(self._content_url(path), params={"ref": self.branch}, timeout=30)
         if response.status_code == 404:

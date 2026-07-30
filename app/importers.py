@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from io import BytesIO
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -12,7 +12,7 @@ def read_excel_rows(file_content: bytes) -> list[list[Any]]:
     return workbook.where(pd.notna(workbook), None).values.tolist()
 
 
-def format_period(value: Any) -> str | None:
+def format_period(value: Any) -> Optional[str]:
     text = str(value or "").strip()
     matched = pd.Series([text]).str.extract(r"(\d{4})/(\d{2})", expand=True)
     year = matched.iloc[0, 0]
@@ -51,7 +51,7 @@ def build_order_store_index(order_map: dict[str, dict[str, Any]]) -> tuple[dict[
     return index, ambiguous
 
 
-def collect_employee_orders_by_id(data: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+def collect_employee_orders_by_id(data: Optional[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     orders_by_id: dict[str, dict[str, Any]] = {}
     payload = data or {}
     for employee in payload.get("employees") or []:
@@ -76,8 +76,8 @@ def collect_employee_orders_by_id(data: dict[str, Any] | None) -> dict[str, dict
 
 
 def apply_employee_orders(
-    employees: list[dict[str, Any]] | None,
-    orders_by_id: dict[str, dict[str, Any]] | None,
+    employees: Optional[list[dict[str, Any]]],
+    orders_by_id: Optional[dict[str, dict[str, Any]]],
 ) -> dict[str, dict[str, Any]]:
     remaining = deepcopy(orders_by_id or {})
     for employee in employees or []:
@@ -122,7 +122,7 @@ def apply_employee_orders(
     return remaining
 
 
-def process_cost_data(rows: list[list[Any]], zone_name: str = "江西战区") -> dict[str, Any] | None:
+def process_cost_data(rows: list[list[Any]], zone_name: str = "江西战区") -> Optional[dict[str, Any]]:
     if not rows:
         return None
 
@@ -335,7 +335,7 @@ def process_cost_data(rows: list[list[Any]], zone_name: str = "江西战区") ->
     }
 
 
-def process_order_data(rows: list[list[Any]]) -> dict[str, Any] | None:
+def process_order_data(rows: list[list[Any]]) -> Optional[dict[str, Any]]:
     if not rows or len(rows) < 2:
         return None
     order_map: dict[str, dict[str, Any]] = {}
@@ -368,7 +368,7 @@ def process_order_data(rows: list[list[Any]]) -> dict[str, Any] | None:
     return {"map": order_map, "deliveryTotal": delivery_total}
 
 
-def process_personal_order_data(rows: list[list[Any]]) -> dict[str, dict[str, Any]] | None:
+def process_personal_order_data(rows: list[list[Any]]) -> Optional[dict[str, dict[str, Any]]]:
     if not rows or len(rows) < 2:
         return None
     header = rows[0] or []
@@ -414,7 +414,7 @@ def build_empty_month(period: str) -> dict[str, Any]:
 
 
 def merge_cost_import(
-    existing_data: dict[str, Any] | None,
+    existing_data: Optional[dict[str, Any]],
     parsed_cost_data: dict[str, Any],
     period_label: str,
 ) -> dict[str, Any]:
@@ -451,7 +451,7 @@ def merge_cost_import(
 
 
 def merge_order_import(
-    existing_data: dict[str, Any] | None,
+    existing_data: Optional[dict[str, Any]],
     order_result: dict[str, Any],
     period_label: str,
 ) -> tuple[dict[str, Any], dict[str, int]]:
@@ -492,7 +492,7 @@ def merge_order_import(
 
 
 def merge_personal_order_import(
-    existing_data: dict[str, Any] | None,
+    existing_data: Optional[dict[str, Any]],
     order_map: dict[str, dict[str, Any]],
     period_label: str,
 ) -> tuple[dict[str, Any], dict[str, int]]:

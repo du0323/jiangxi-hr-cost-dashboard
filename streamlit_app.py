@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
+from typing import Any, Optional
 
 import streamlit as st
 from streamlit.errors import StreamlitSecretNotFoundError
@@ -160,7 +160,7 @@ def list_months_cached() -> list[str]:
 
 
 @st.cache_data(show_spinner=False)
-def load_month_cached(ym: str) -> dict[str, Any] | None:
+def load_month_cached(ym: str) -> Optional[dict[str, Any]]:
     return REPOSITORY.load_month(ym)
 
 
