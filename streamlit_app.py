@@ -857,8 +857,11 @@ def render_preview_board(cost_preview: pd.DataFrame, order_preview: pd.DataFrame
 
 
 def render_import_bar(month_options: list[str]) -> tuple[str, Any, Any, Any, bool]:
+    current_year, current_month = st.session_state.selected_month.split("-", 1)
+    year_options = sorted({ym.split("-", 1)[0] for ym in month_options} | {current_year, str(int(current_year) - 1), str(int(current_year) + 1)}, reverse=True)
+    month_labels = {index: f"{index}月" for index in range(1, 13)}
     with st.container(key="legacy-import-bar"):
-        columns = st.columns([0.9, 1.35, 1.35, 1.35, 1.2, 1.0])
+        columns = st.columns([0.8, 1.2, 1.2, 1.2, 0.8, 0.8, 1.0])
         with columns[0]:
             st.markdown("<div class='legacy-month-label'>导入数据</div>", unsafe_allow_html=True)
         with columns[1]:
@@ -868,17 +871,25 @@ def render_import_bar(month_options: list[str]) -> tuple[str, Any, Any, Any, boo
         with columns[3]:
             personal_file = st.file_uploader("上传个人定单数据", type=["xlsx", "xls"], key="personal_uploader", label_visibility="collapsed")
         with columns[4]:
-            selected_month = st.selectbox(
-                "导入至月份",
-                options=month_options,
-                index=month_options.index(st.session_state.selected_month) if st.session_state.selected_month in month_options else 0,
-                format_func=ym_to_label,
+            selected_year = st.selectbox(
+                "年份",
+                options=year_options,
+                index=year_options.index(current_year),
                 label_visibility="collapsed",
             )
         with columns[5]:
+            selected_month_number = st.selectbox(
+                "月份",
+                options=list(range(1, 13)),
+                index=int(current_month) - 1,
+                format_func=lambda value: month_labels[value],
+                label_visibility="collapsed",
+            )
+        with columns[6]:
             save_clicked = st.button("保存当前月份", use_container_width=True)
-        st.markdown("<div class='legacy-import-tip'>上传后会先在页面中预览，再写入当月数据。</div>", unsafe_allow_html=True)
-    return selected_month, roster_file, order_file, personal_file, save_clicked
+        st.markdown("<div class='legacy-import-tip'>上传后会先在页面中预览，再写入所选年月数据。</div>", unsafe_allow_html=True)
+    selected_ym = f"{selected_year}-{int(selected_month_number):02d}"
+    return selected_ym, roster_file, order_file, personal_file, save_clicked
 
 
 def render_month_bar(month_options: list[str], selected_month: str) -> None:
@@ -1044,13 +1055,13 @@ render_page_header(
     period_label,
 )
 selected_month, roster_file, order_file, personal_file, save_clicked = render_import_bar(month_options)
-if selected_month != st.session_state.selected_month:
+if selected_month != st.session_state.selected_month and not any(file is not None for file in [roster_file, order_file, personal_file]):
     load_selected_month(selected_month)
     st.rerun()
 
 page_messages: list[tuple[str, str]] = []
 month_data = deepcopy(st.session_state.month_data)
-period_label = ym_to_label(st.session_state.selected_month)
+period_label = ym_to_label(selected_month)
 
 if roster_file is not None:
     try:
@@ -1098,10 +1109,12 @@ if personal_file is not None:
         page_messages.append(("error", f"个人定单数据导入失败：{exc}"))
 
 if save_clicked:
-    payload = normalize_month_data(deepcopy(st.session_state.month_data))
-    REPOSITORY.save_month(st.session_state.selected_month, payload)
+    st.session_state.selected_month = selected_month
+    st.session_state.month_data = month_data
+    payload = normalize_month_data(deepcopy(month_data))
+    REPOSITORY.save_month(selected_month, payload)
     refresh_month_cache()
-    page_messages.append(("success", f"已保存到 {ym_to_label(st.session_state.selected_month)}"))
+    page_messages.append(("success", f"已保存到 {ym_to_label(selected_month)}"))
 
 for level, message in page_messages:
     if level == "success":
