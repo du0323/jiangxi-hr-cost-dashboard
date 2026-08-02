@@ -857,7 +857,7 @@ def render_preview_board(cost_preview: pd.DataFrame, order_preview: pd.DataFrame
 
 
 def render_import_bar(month_options: list[str]) -> tuple[str, Any, Any, Any, bool]:
-    current_year, current_month = st.session_state.selected_month.split("-", 1)
+    current_year, current_month = st.session_state.import_target_month.split("-", 1)
     year_options = sorted({ym.split("-", 1)[0] for ym in month_options} | {current_year, str(int(current_year) - 1), str(int(current_year) + 1)}, reverse=True)
     month_labels = {index: f"{index}月" for index in range(1, 13)}
     with st.container(key="legacy-import-bar"):
@@ -1022,11 +1022,14 @@ if "preview_order" not in st.session_state:
     st.session_state.preview_order = None
 if "preview_personal" not in st.session_state:
     st.session_state.preview_personal = None
+if "import_target_month" not in st.session_state:
+    st.session_state.import_target_month = st.session_state.selected_month
 
 
 def load_selected_month(ym: str) -> None:
     data = load_month_cached(ym)
     st.session_state.selected_month = ym
+    st.session_state.import_target_month = ym
     st.session_state.month_data = normalize_month_data(data) or empty_month(ym_to_label(ym))
     st.session_state.preview_cost = None
     st.session_state.preview_order = None
@@ -1055,6 +1058,7 @@ render_page_header(
     period_label,
 )
 selected_month, roster_file, order_file, personal_file, save_clicked = render_import_bar(month_options)
+st.session_state.import_target_month = selected_month
 if selected_month != st.session_state.selected_month and not any(file is not None for file in [roster_file, order_file, personal_file]):
     load_selected_month(selected_month)
     st.rerun()
@@ -1110,6 +1114,7 @@ if personal_file is not None:
 
 if save_clicked:
     st.session_state.selected_month = selected_month
+    st.session_state.import_target_month = selected_month
     st.session_state.month_data = month_data
     payload = normalize_month_data(deepcopy(month_data))
     REPOSITORY.save_month(selected_month, payload)
@@ -1128,9 +1133,21 @@ prev_month_data = normalize_month_data(load_month_cached(prev_month)) if prev_mo
 annual_months = tuple(list_months_cached())
 annual_payloads = load_annual_payloads(annual_months) if annual_months else []
 
-cost_preview = st.session_state.preview_cost or display_preview_frame(build_cost_preview(month_data))
-order_preview = st.session_state.preview_order or display_preview_frame(build_order_preview(month_data))
-personal_preview = st.session_state.preview_personal or display_preview_frame(build_personal_preview(month_data))
+cost_preview = (
+    st.session_state.preview_cost
+    if st.session_state.preview_cost is not None
+    else display_preview_frame(build_cost_preview(month_data))
+)
+order_preview = (
+    st.session_state.preview_order
+    if st.session_state.preview_order is not None
+    else display_preview_frame(build_order_preview(month_data))
+)
+personal_preview = (
+    st.session_state.preview_personal
+    if st.session_state.preview_personal is not None
+    else display_preview_frame(build_personal_preview(month_data))
+)
 render_preview_board(cost_preview, order_preview, personal_preview)
 render_month_bar(month_options, st.session_state.selected_month)
 
