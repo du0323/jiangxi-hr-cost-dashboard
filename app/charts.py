@@ -113,6 +113,8 @@ def build_mom_chart(frame: pd.DataFrame, current_label: str, previous_label: str
 
 
 def build_retail_orders_chart(retail_frame: pd.DataFrame) -> go.Figure:
+    if retail_frame.empty:
+        return _empty_figure(320)
     chart_data = retail_frame.dropna(subset=["定单实际", "定单目标"]).copy()
     if chart_data.empty:
         return _empty_figure(320)

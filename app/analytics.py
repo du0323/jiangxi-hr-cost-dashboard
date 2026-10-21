@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from math import isfinite
 from typing import Any, Optional
 
 import pandas as pd
@@ -89,11 +90,22 @@ def _float(value: Any) -> float:
         return 0.0
 
 
-def _int(value: Any) -> int:
+def _order_number(value: Any) -> Optional[int]:
     try:
-        return int(float(value or 0))
-    except (TypeError, ValueError):
-        return 0
+        number = float(value)
+        return int(number) if isfinite(number) else None
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _display_order(value: Any) -> Any:
+    number = _order_number(value)
+    return number if number is not None else "—"
+
+
+def _int(value: Any) -> int:
+    number = _order_number(value)
+    return number if number is not None else 0
 
 
 def _sum(items: list[dict[str, Any]], field: str) -> float:
@@ -384,7 +396,7 @@ def build_retail_summary_cards(data: dict[str, Any]) -> list[dict[str, str]]:
 
 def build_retail_notice(data: dict[str, Any]) -> str:
     retail_stores = data.get("retailStores") or []
-    missing_orders = [store for store in retail_stores if store.get("orders_actual") is None]
+    missing_orders = [store for store in retail_stores if _order_number(store.get("orders_actual")) is None]
     notice = f"数据说明：共 {len(retail_stores)} 家门店有成本数据"
     if missing_orders:
         notice += f"；其中 {len(missing_orders)} 家暂无定单数据"
@@ -399,13 +411,13 @@ def build_retail_frame(data: dict[str, Any], prev_data: Optional[dict[str, Any]]
         fixed = _float(store.get("fixed"))
         perf = _float(store.get("perf"))
         count = _int(store.get("count"))
-        actual = store.get("orders_actual")
-        target = store.get("orders_target")
+        actual = _order_number(store.get("orders_actual"))
+        target = _order_number(store.get("orders_target"))
         prev_store = prev_map.get(str(store.get("name") or ""))
         prev_labor = _float(prev_store.get("labor")) if prev_store else None
-        rate = (_int(actual) / _int(target)) if actual is not None and target not in (None, 0) else None
+        rate = actual / target if actual is not None and target else None
         avg_total = labor / count if count else None
-        human_eff = (_int(actual) / count) if actual is not None and count else None
+        human_eff = actual / count if actual is not None and count else None
         rows.append(
             {
                 "门店": store.get("name") or "",
@@ -421,12 +433,12 @@ def build_retail_frame(data: dict[str, Any], prev_data: Optional[dict[str, Any]]
                 "固浮比": fixed / labor if labor else None,
                 "人均固定成本": fixed / count if count else None,
                 "人均变动成本": perf / count if count else None,
-                "定单实际": _int(actual) if actual is not None else None,
-                "定单目标": _int(target) if target is not None else None,
+                "定单实际": actual,
+                "定单目标": target,
                 "达成率": rate,
                 "人均总成本": avg_total,
                 "人效(单/人)": human_eff,
-                "人力CPS": (labor / _int(actual)) if actual not in (None, 0) else None,
+                "人力CPS": labor / actual if actual else None,
                 "达成状态": _rate_bucket(rate),
                 "法定加班": _float(store.get("overtime_legal")),
                 "出差津贴": _float(store.get("travel")),
@@ -597,22 +609,26 @@ def build_retail_quadrant_summary(quadrant_frame: pd.DataFrame) -> list[dict[str
 
 
 def build_support_frame(data: dict[str, Any]) -> pd.DataFrame:
-    rows = []
-    for item in data.get("supportDepts") or []:
-        labor = _float(item.get("labor"))
-        count = _int(item.get("count"))
-        rows.append(
+    items = data.get("supportDepts") or []
+    if not items:
+        return pd.DataFrame()
+    labor = _sum(items, "labor")
+    fixed = _sum(items, "fixed")
+    perf = _sum(items, "perf")
+    count = int(_sum(items, "count"))
+    return pd.DataFrame(
+        [
             {
-                "部门": item.get("name") or "",
+                "部门": "零售战区支持",
                 "人数": count,
                 "人工成本": labor,
-                "固定成本": _float(item.get("fixed")),
-                "绩效成本": _float(item.get("perf")),
-                "固浮比": (_float(item.get("fixed")) / labor) if labor else None,
+                "固定成本": fixed,
+                "绩效成本": perf,
+                "固浮比": fixed / labor if labor else None,
                 "人均总成本": labor / count if count else None,
             }
-        )
-    return pd.DataFrame(rows)
+        ]
+    )
 
 
 def build_delivery_summary_cards(data: dict[str, Any]) -> list[dict[str, str]]:
@@ -677,42 +693,56 @@ def build_delivery_insight(frame: pd.DataFrame) -> str:
 
 
 def build_delivery_support_frame(data: dict[str, Any]) -> pd.DataFrame:
-    rows = []
-    for item in data.get("deliverySupport") or []:
-        labor = _float(item.get("labor"))
-        count = _int(item.get("count"))
-        rows.append(
+    items = data.get("deliverySupport") or []
+    if not items:
+        return pd.DataFrame()
+    labor = _sum(items, "labor")
+    fixed = _sum(items, "fixed")
+    perf = _sum(items, "perf")
+    count = int(_sum(items, "count"))
+    return pd.DataFrame(
+        [
             {
-                "类别": item.get("name") or "",
+                "类别": "交付战区支持",
                 "人数": count,
                 "人工成本": labor,
-                "固定成本": _float(item.get("fixed")),
-                "绩效成本": _float(item.get("perf")),
-                "固浮比": (_float(item.get("fixed")) / labor) if labor else None,
+                "固定成本": fixed,
+                "绩效成本": perf,
+                "固浮比": fixed / labor if labor else None,
                 "人均总成本": labor / count if count else None,
             }
-        )
-    return pd.DataFrame(rows)
+        ]
+    )
 
 
 def build_personnel_frame(data: dict[str, Any], exclude_interns: bool = True) -> pd.DataFrame:
+    retail_store_names = {item.get("name") for item in data.get("retailStores") or []}
+    delivery_store_names = {item.get("name") for item in data.get("deliveryStores") or []}
+    retail_support_names = {item.get("name") for item in data.get("supportDepts") or []}
+    delivery_support_names = {item.get("name") for item in data.get("deliverySupport") or []}
     rows = []
     for employee in data.get("employees") or []:
         if exclude_interns and employee.get("isIntern") is True:
             continue
         if (employee.get("title") or "") == "零售主管":
             continue
+        store = employee.get("store") or ""
+        dept = employee.get("dept") or ""
+        if store in delivery_support_names and store not in delivery_store_names and employee.get("cat") == "交付":
+            store = dept = "交付战区支持"
+        elif store in retail_support_names and store not in retail_store_names and employee.get("cat") == "零售":
+            store = dept = "零售战区支持"
         rows.append(
             {
                 "工号": employee.get("id") or "",
                 "姓名": employee.get("name") or "",
                 "岗位": employee.get("title") or "",
-                "门店": employee.get("store") or "",
-                "所属部门": employee.get("dept") or "",
+                "门店": store,
+                "所属部门": dept,
                 "分类": employee.get("cat") or "",
                 "个人成本": _float(employee.get("labor")),
-                "个人定单量": _int(employee.get("orders")) if employee.get("orders") is not None else 0,
-                "有定单": employee.get("orders") is not None and _int(employee.get("orders")) > 0,
+                "个人定单量": _int(employee.get("orders")),
+                "有定单": _int(employee.get("orders")) > 0,
             }
         )
     return pd.DataFrame(rows)
@@ -898,18 +928,19 @@ def build_cost_preview(data: dict[str, Any]) -> pd.DataFrame:
 
 
 def build_order_preview(data: dict[str, Any]) -> pd.DataFrame:
-    rows = [
-        {
-            "门店": store.get("name") or "—",
-            "部门": store.get("dept") or "—",
-            "定单量": store.get("orders_actual"),
-            "目标": store.get("orders_target"),
-            "达成率": (store.get("orders_actual") / store.get("orders_target"))
-            if store.get("orders_actual") is not None and store.get("orders_target") not in (None, 0)
-            else None,
-        }
-        for store in (data.get("retailStores") or [])[:50]
-    ]
+    rows = []
+    for store in (data.get("retailStores") or [])[:50]:
+        actual = _order_number(store.get("orders_actual"))
+        target = _order_number(store.get("orders_target"))
+        rows.append(
+            {
+                "门店": store.get("name") or "—",
+                "部门": store.get("dept") or "—",
+                "定单量": actual,
+                "目标": target,
+                "达成率": actual / target if actual is not None and target else None,
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -970,8 +1001,8 @@ def display_retail_frame(frame: pd.DataFrame) -> pd.DataFrame:
     display["固浮比"] = display["固浮比"].map(format_percent)
     display["达成率"] = display["达成率"].map(format_percent)
     display["人效(单/人)"] = display["人效(单/人)"].map(lambda value: "—" if value is None else f"{value:.2f}")
-    display["定单实际"] = display["定单实际"].map(lambda value: "—" if _is_missing(value) else int(value))
-    display["定单目标"] = display["定单目标"].map(lambda value: "—" if _is_missing(value) else int(value))
+    display["定单实际"] = display["定单实际"].map(_display_order)
+    display["定单目标"] = display["定单目标"].map(_display_order)
     return display
 
 
@@ -1023,7 +1054,7 @@ def display_personnel_frame(frame: pd.DataFrame) -> pd.DataFrame:
     if "象限编号" in display.columns:
         display = display.drop(columns=["象限编号", "中位个人成本", "中位个人定单量"], errors="ignore")
     display["个人成本"] = display["个人成本"].map(format_number)
-    display["个人定单量"] = display["个人定单量"].map(lambda value: "—" if _is_missing(value) else int(value))
+    display["个人定单量"] = display["个人定单量"].map(_display_order)
     return display
 
 
@@ -1055,7 +1086,7 @@ def display_preview_frame(frame: pd.DataFrame) -> pd.DataFrame:
     display = frame.copy()
     for column in ["人工成本", "定单量", "目标", "个人定单量"]:
         if column in display.columns:
-            display[column] = display[column].map(lambda value: "—" if _is_missing(value) else int(value))
+            display[column] = display[column].map(_display_order)
     if "达成率" in display.columns:
         display["达成率"] = display["达成率"].map(format_percent)
     return display
