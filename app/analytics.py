@@ -970,8 +970,8 @@ def display_retail_frame(frame: pd.DataFrame) -> pd.DataFrame:
     display["固浮比"] = display["固浮比"].map(format_percent)
     display["达成率"] = display["达成率"].map(format_percent)
     display["人效(单/人)"] = display["人效(单/人)"].map(lambda value: "—" if value is None else f"{value:.2f}")
-    display["定单实际"] = display["定单实际"].map(lambda value: "—" if value is None else int(value))
-    display["定单目标"] = display["定单目标"].map(lambda value: "—" if value is None else int(value))
+    display["定单实际"] = display["定单实际"].map(lambda value: "—" if _is_missing(value) else int(value))
+    display["定单目标"] = display["定单目标"].map(lambda value: "—" if _is_missing(value) else int(value))
     return display
 
 
@@ -1023,7 +1023,7 @@ def display_personnel_frame(frame: pd.DataFrame) -> pd.DataFrame:
     if "象限编号" in display.columns:
         display = display.drop(columns=["象限编号", "中位个人成本", "中位个人定单量"], errors="ignore")
     display["个人成本"] = display["个人成本"].map(format_number)
-    display["个人定单量"] = display["个人定单量"].map(lambda value: "—" if value is None else int(value))
+    display["个人定单量"] = display["个人定单量"].map(lambda value: "—" if _is_missing(value) else int(value))
     return display
 
 
@@ -1055,7 +1055,7 @@ def display_preview_frame(frame: pd.DataFrame) -> pd.DataFrame:
     display = frame.copy()
     for column in ["人工成本", "定单量", "目标", "个人定单量"]:
         if column in display.columns:
-            display[column] = display[column].map(lambda value: "—" if value is None else int(value))
+            display[column] = display[column].map(lambda value: "—" if _is_missing(value) else int(value))
     if "达成率" in display.columns:
         display["达成率"] = display["达成率"].map(format_percent)
     return display

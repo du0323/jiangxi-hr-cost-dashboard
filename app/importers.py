@@ -8,7 +8,7 @@ import pandas as pd
 
 
 def read_excel_rows(file_content: bytes) -> list[list[Any]]:
-    workbook = pd.read_excel(BytesIO(file_content), sheet_name=0, header=None)
+    workbook = pd.read_excel(BytesIO(file_content), sheet_name=0, header=None, dtype=object)
     return workbook.where(pd.notna(workbook), None).values.tolist()
 
 
@@ -195,26 +195,18 @@ def process_cost_data(rows: list[list[Any]], zone_name: str = "江西战区") ->
                 period = format_period(text)
                 break
 
-    def classify(dept3: Any, dept4: Any) -> str:
-        level4 = str(dept4 or "")
-        level3 = str(dept3 or "")
-        if "零售中心" in level4 or "零售展厅" in level4:
+    def text(value: Any) -> str:
+        if value is None or pd.isna(value):
+            return ""
+        result = str(value).strip()
+        return "" if result.lower() == "nan" else result
+
+    def classify(dept4: str) -> str:
+        if "零售中心" in dept4 or "零售展厅" in dept4:
             return "零售"
-        if "交付中心" in level4:
-            return "交付"
-        if not dept4 and level3 == "交付":
+        if "交付中心" in dept4:
             return "交付"
         return "零售"
-
-    def get_store(dept3: Any, dept4: Any) -> str:
-        if dept4 is not None and str(dept4).strip():
-            return str(dept4).strip()
-        if dept3 is not None and str(dept3).strip():
-            return str(dept3).strip()
-        return f"{zone_name}总部"
-
-    def get_dept(dept3: Any, dept4: Any) -> str:
-        return str(dept3 or "") if dept4 is not None and str(dept4).strip() else "战区直属"
 
     def number_at(row: list[Any], index: int) -> float:
         if index < 0 or index >= len(row):
@@ -231,26 +223,18 @@ def process_cost_data(rows: list[list[Any]], zone_name: str = "江西战区") ->
     for row in rows[header_idx + 1 :]:
         if i_d2 >= len(row) or not row[i_d2]:
             continue
-        dept3 = row[i_d3] if i_d3 < len(row) else None
-        dept4 = row[i_d4] if i_d4 < len(row) else None
-        title = str(row[i_title] or "").strip() if i_title >= 0 and i_title < len(row) else ""
-        if title == "区域交付负责人":
-            category = "交付"
-            store = dept = "交付战区支持"
-            is_store = False
-        elif (
-            str(dept3).strip().lower() == "nan"
-            or str(dept4).strip().lower() == "nan"
-            or not (str(dept3 or "").strip() or str(dept4 or "").strip())
-        ):
-            category = "零售"
-            store = dept = "零售战区支持"
+        dept3 = text(row[i_d3]) if i_d3 < len(row) else ""
+        dept4 = text(row[i_d4]) if i_d4 < len(row) else ""
+        title = text(row[i_title]) if i_title >= 0 and i_title < len(row) else ""
+        if not dept4:
+            category = "交付" if dept3 == "交付" or title == "区域交付负责人" else "零售"
+            store = dept = "交付战区支持" if category == "交付" else "零售战区支持"
             is_store = False
         else:
-            category = classify(dept3, dept4)
-            store = get_store(dept3, dept4)
-            dept = get_dept(dept3, dept4)
-            is_store = bool(dept4 is not None and str(dept4).strip())
+            category = classify(dept4)
+            store = dept4
+            dept = dept3
+            is_store = True
         not_counted = str(row[i_count]) != "是" if i_count >= 0 and i_count < len(row) else True
         is_intern = not_counted and title == "实习生"
 
@@ -291,8 +275,8 @@ def process_cost_data(rows: list[list[Any]], zone_name: str = "江西战区") ->
 
         employees.append(
             {
-                "id": str(row[i_id] or "").strip() if i_id >= 0 and i_id < len(row) else "",
-                "name": str(row[i_name] or "").strip() if i_name >= 0 and i_name < len(row) else "",
+                "id": text(row[i_id]) if i_id >= 0 and i_id < len(row) else "",
+                "name": text(row[i_name]) if i_name >= 0 and i_name < len(row) else "",
                 "title": title,
                 "store": store,
                 "dept": dept,
