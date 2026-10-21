@@ -163,7 +163,9 @@ def process_cost_data(rows: list[list[Any]], zone_name: str = "江西战区") ->
     if i_d4 < 0:
         i_d4 = 2
 
-    i_id = ci("工号")
+    i_id = ci("员工ID")
+    if i_id < 0:
+        i_id = ci("工号")
     i_name = ci("姓名")
     i_title = ci("职务（岗位）")
     i_labor = ci("人工成本")
@@ -231,12 +233,25 @@ def process_cost_data(rows: list[list[Any]], zone_name: str = "江西战区") ->
             continue
         dept3 = row[i_d3] if i_d3 < len(row) else None
         dept4 = row[i_d4] if i_d4 < len(row) else None
-        category = classify(dept3, dept4)
-        store = get_store(dept3, dept4)
-        dept = get_dept(dept3, dept4)
-        is_store = bool(dept4 is not None and str(dept4).strip())
-        not_counted = str(row[i_count]) != "是" if i_count >= 0 and i_count < len(row) else True
         title = str(row[i_title] or "").strip() if i_title >= 0 and i_title < len(row) else ""
+        if title == "区域交付负责人":
+            category = "交付"
+            store = dept = "交付战区支持"
+            is_store = False
+        elif (
+            str(dept3).strip().lower() == "nan"
+            or str(dept4).strip().lower() == "nan"
+            or not (str(dept3 or "").strip() or str(dept4 or "").strip())
+        ):
+            category = "零售"
+            store = dept = "零售战区支持"
+            is_store = False
+        else:
+            category = classify(dept3, dept4)
+            store = get_store(dept3, dept4)
+            dept = get_dept(dept3, dept4)
+            is_store = bool(dept4 is not None and str(dept4).strip())
+        not_counted = str(row[i_count]) != "是" if i_count >= 0 and i_count < len(row) else True
         is_intern = not_counted and title == "实习生"
 
         if store not in stores:

@@ -865,11 +865,11 @@ def render_import_bar(month_options: list[str]) -> tuple[str, Any, Any, Any, boo
         with columns[0]:
             st.markdown("<div class='legacy-month-label'>导入数据</div>", unsafe_allow_html=True)
         with columns[1]:
-            roster_file = st.file_uploader("上传花名册", type=["xlsx", "xls"], key="roster_uploader", label_visibility="collapsed")
+            roster_file = st.file_uploader("花名册导入", type=["xlsx", "xls"], key="roster_uploader")
         with columns[2]:
-            order_file = st.file_uploader("上传定单数据", type=["xlsx", "xls"], key="order_uploader", label_visibility="collapsed")
+            order_file = st.file_uploader("部门定单导入", type=["xlsx", "xls"], key="order_uploader")
         with columns[3]:
-            personal_file = st.file_uploader("上传个人定单数据", type=["xlsx", "xls"], key="personal_uploader", label_visibility="collapsed")
+            personal_file = st.file_uploader("个人定单数据导入", type=["xlsx", "xls"], key="personal_uploader")
         with columns[4]:
             selected_year = st.selectbox(
                 "年份",
